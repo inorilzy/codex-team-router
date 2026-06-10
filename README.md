@@ -135,7 +135,7 @@ After editing plugin code, run the validators:
 ```powershell
 python $env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py plugins\codex-team-router\skills\codex-team-router
 python $env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py plugins\codex-team-router
-node plugins\codex-team-router\scripts\route-fixtures.mjs
+node plugins\codex-team-router\scripts\check-source.mjs
 node plugins\codex-team-router\scripts\doctor.mjs
 ```
 
@@ -264,14 +264,45 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 
 ## Maintenance scripts
 
+- `scripts/check-source.mjs`: runs the source-tree checks used by GitHub
+  Actions. It currently runs route fixtures and source-only doctor.
 - `scripts/route-fixtures.mjs`: runs hook classification fixtures in temporary
   workspaces and verifies marker injection, route classification, `status.json`,
   `task_board`, and `next_action`.
 - `scripts/smoke-install.mjs`: creates a temporary `CODEX_HOME`, adds the local
   repo marketplace, installs `codex-team-router@codex-team-router`, and checks
   that Codex reports it as installed and enabled.
+- `scripts/sync-agents.mjs`: dry-runs or installs bundled custom-agent
+  templates into project-local `.codex/agents`, global `~/.codex/agents`, or a
+  custom target directory. It copies missing files by default and overwrites
+  only with `--force --write`.
+- `scripts/doctor.mjs --source-only`: checks source-tree structure, hook
+  simulation, runtime status summary, and bundled custom-agent templates without
+  requiring a local Codex install.
 - `scripts/doctor.mjs`: checks plugin structure, hook simulation, model catalog
-  fallback, runtime status summary, and bundled/global custom-agent drift.
+  fallback, runtime status summary, install state, hook trust, and
+  bundled/global custom-agent drift.
+
+The GitHub Actions workflow runs `route-fixtures.mjs` and
+`doctor.mjs --source-only` through `check-source.mjs`, so pull requests can
+validate the source tree without needing a Codex App profile or local model
+catalog.
+
+See [docs/release-checklist.md](docs/release-checklist.md) for the full
+pre-publish checklist.
+
+Install bundled agent templates into the current project:
+
+```powershell
+node plugins\codex-team-router\scripts\sync-agents.mjs
+node plugins\codex-team-router\scripts\sync-agents.mjs --write
+```
+
+Install them globally:
+
+```powershell
+node plugins\codex-team-router\scripts\sync-agents.mjs --global --write
+```
 
 ## Troubleshooting
 

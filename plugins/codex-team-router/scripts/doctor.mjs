@@ -16,6 +16,7 @@ const hookScriptPath = join(pluginRoot, "scripts", "codex-team-router-hook.mjs")
 const modelScriptPath = join(pluginRoot, "scripts", "refresh-model-profiles.mjs");
 const routeFixturesScriptPath = join(pluginRoot, "scripts", "route-fixtures.mjs");
 const smokeInstallScriptPath = join(pluginRoot, "scripts", "smoke-install.mjs");
+const syncAgentsScriptPath = join(pluginRoot, "scripts", "sync-agents.mjs");
 const skillRoot = join(pluginRoot, "skills", "codex-team-router");
 const assetHookScriptPath = join(skillRoot, "assets", "hooks", "codex-team-router-hook.mjs");
 const assetModelScriptPath = join(skillRoot, "assets", "scripts", "refresh-model-profiles.mjs");
@@ -24,6 +25,7 @@ const globalAgentsDir = join(codexHome, "agents");
 const pluginName = "codex-team-router";
 const routeMarker = "CODEX_TEAM_ROUTER_ROUTE_REQUIRED";
 const runtimeStatusPath = join(process.cwd(), ".codex", "team-router", "status.json");
+const sourceOnly = process.argv.includes("--source-only");
 
 const results = [];
 
@@ -99,6 +101,7 @@ function checkFiles() {
   record(existsSync(hookScriptPath) ? "pass" : "fail", "Hook script exists", hookScriptPath);
   record(existsSync(routeFixturesScriptPath) ? "pass" : "fail", "Route fixture script exists", routeFixturesScriptPath);
   record(existsSync(smokeInstallScriptPath) ? "pass" : "fail", "Smoke install script exists", smokeInstallScriptPath);
+  record(existsSync(syncAgentsScriptPath) ? "pass" : "fail", "Agent template sync script exists", syncAgentsScriptPath);
   record(existsSync(assetHookScriptPath) ? "pass" : "fail", "Asset hook script exists", assetHookScriptPath);
   record(existsSync(assetModelScriptPath) ? "pass" : "fail", "Asset model refresh script exists", assetModelScriptPath);
   if (existsSync(hookScriptPath) && existsSync(assetHookScriptPath)) {
@@ -334,20 +337,46 @@ function checkAgentTemplates() {
   record(/sandbox_mode\s*=\s*"read-only"/.test(verifierGlobal) ? "pass" : "warn", "Global verifier is read-only");
 }
 
+function checkBundledAgentTemplates() {
+  const expected = ["analyst", "planner", "plan-reviewer", "executor", "reviewer", "explorer", "verifier"];
+  const templates = existsSync(agentTemplateDir)
+    ? readdirSync(agentTemplateDir).filter((name) => name.endsWith(".toml")).sort()
+    : [];
+
+  record(templates.length === expected.length ? "pass" : "fail", "Bundled custom-agent template count", `${templates.length}/${expected.length}`);
+
+  for (const name of expected) {
+    record(
+      existsSync(join(agentTemplateDir, `${name}.toml`)) ? "pass" : "fail",
+      `Bundled custom-agent template exists: ${name}.toml`
+    );
+  }
+
+  const verifierTemplate = readText(join(agentTemplateDir, "verifier.toml"));
+  record(/sandbox_mode\s*=\s*"read-only"/.test(verifierTemplate) ? "pass" : "fail", "Bundled verifier is read-only");
+}
+
 console.log("Codex Team Router doctor");
 console.log(`Plugin root: ${pluginRoot}`);
 console.log(`Codex home: ${codexHome}`);
+if (sourceOnly) {
+  console.log("Mode: source-only");
+}
 console.log("");
 
 checkFiles();
 checkManifest();
 checkHooksJson();
-checkConfig();
-checkPluginCli();
 checkHookSimulation();
 checkRuntimeStatusSummary();
-checkModelFallback();
-checkAgentTemplates();
+if (sourceOnly) {
+  checkBundledAgentTemplates();
+} else {
+  checkConfig();
+  checkPluginCli();
+  checkModelFallback();
+  checkAgentTemplates();
+}
 
 const failCount = results.filter((item) => item.level === "fail").length;
 const warnCount = results.filter((item) => item.level === "warn").length;
@@ -358,9 +387,13 @@ console.log(`Summary: ${failCount} fail(s), ${warnCount} warning(s), ${results.l
 if (warnCount > 0) {
   console.log("");
   console.log("Next steps for warnings:");
-  console.log("- If the plugin is not installed, add this marketplace and run `codex plugin add codex-team-router@codex-team-router`.");
-  console.log("- If trusted hook entries are missing, restart Codex App or open a new thread, then review and trust the plugin hooks.");
-  console.log("- If global custom agents drift from bundled templates, copy the desired templates from `skills/codex-team-router/assets/codex-agents/` to `~/.codex/agents/`.");
+  if (sourceOnly) {
+    console.log("- Source-only mode should normally be warning-free. Inspect the warning details above before publishing.");
+  } else {
+    console.log("- If the plugin is not installed, add this marketplace and run `codex plugin add codex-team-router@codex-team-router`.");
+    console.log("- If trusted hook entries are missing, restart Codex App or open a new thread, then review and trust the plugin hooks.");
+    console.log("- If global custom agents drift from bundled templates, run `node scripts/sync-agents.mjs --global --write` from the plugin root, adding `--force` only when overwriting is intentional.");
+  }
 }
 
 if (failCount > 0) {

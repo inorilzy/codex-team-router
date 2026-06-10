@@ -1,0 +1,22 @@
+name: Source Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run source checks
+        run: node plugins/codex-team-router/scripts/check-source.mjs

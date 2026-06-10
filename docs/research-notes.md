@@ -43,6 +43,13 @@ Router without turning the plugin into a separate runtime.
   starting Codex App.
 - Add local marketplace smoke install so packaging changes can be tested in a
   temporary `CODEX_HOME`.
+- Add a source-only doctor mode and GitHub Actions workflow so pull requests can
+  validate repository structure and hook behavior without local Codex config,
+  trusted hooks, global agents, or model catalogs.
+- Add a single source-check command and release checklist so source checks,
+  install smoke tests, and environment-specific doctor runs are separated.
+- Add a dry-run-first custom-agent template sync helper for project-local,
+  global, or explicit target installs.
 
 ## Not adopted yet
 
@@ -57,10 +64,8 @@ Router without turning the plugin into a separate runtime.
 
 ## Candidate backlog
 
-- Add a CI workflow that runs validation, route fixtures, doctor, and smoke
-  install where the Codex CLI is available.
+- Add a separate optional CI job that runs full install smoke tests when a Codex
+  CLI binary is available.
 - Add richer route fixtures for more edge-case prompt categories.
-- Add optional project-local agent template sync commands instead of only doctor
-  warnings.
 - Add a short comparison section to README once the public API and install path
   stabilize.

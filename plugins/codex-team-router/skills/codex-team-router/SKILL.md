@@ -363,6 +363,18 @@ repository. Prefer global installation when the user wants these team roles
 available everywhere. Do not overwrite existing custom agents unless the user
 explicitly asks for that.
 
+When this skill is installed as a plugin, prefer the bundled sync helper instead
+of manual copying:
+
+```bash
+node scripts/sync-agents.mjs
+node scripts/sync-agents.mjs --write
+node scripts/sync-agents.mjs --global --write
+```
+
+The sync helper is dry-run by default. It copies missing files with `--write`
+and overwrites changed files only with `--force --write`.
+
 If a custom agent name matches a built-in agent such as `explorer`, the custom
 agent takes precedence. Call this out before installing templates that shadow
 built-in names.

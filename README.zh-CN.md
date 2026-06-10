@@ -22,6 +22,32 @@ codex-team-router/
     skills/codex-team-router/
 ```
 
+## 一图看懂
+
+```mermaid
+flowchart TD
+  A["用户发送 prompt"] --> B{"只是简单终端命令？"}
+  B -- "是" --> C["主线程直接执行命令"]
+  B -- "否" --> D["UserPromptSubmit hook 检查 prompt"]
+  D --> E{"是工程任务吗？"}
+  E -- "否" --> F["不注入 router marker"]
+  E -- "是" --> G["注入 CODEX_TEAM_ROUTER_ROUTE_REQUIRED"]
+  G --> H["Codex 使用 codex-team-router skill"]
+  H --> I["输出可见路由回执"]
+  I --> J{"路由级别"}
+  J -- "trivial 或 small" --> K["主线程处理任务"]
+  J -- "standard" --> L["计划、执行、审查"]
+  J -- "complex" --> M["分析、计划、审查计划、执行、审查"]
+  J -- "high_risk" --> N["分析、计划 gate、限定 executor、审查、验证"]
+  L --> O{"用户明确授权 subagents？"}
+  M --> O
+  N --> O
+  O -- "是" --> P["工具可用时 spawn 可见的 Codex App subagents"]
+  O -- "否" --> Q["留在主线程，或先询问是否委派"]
+  P --> R["主线程整合、验证并汇报"]
+  Q --> R
+```
+
 ## 它能做什么
 
 - 增加 `codex-team-router` skill，用于创建、修改、修复、重构、审查、验证或构建代码。

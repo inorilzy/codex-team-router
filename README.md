@@ -25,6 +25,32 @@ codex-team-router/
     skills/codex-team-router/
 ```
 
+## Flow at a glance
+
+```mermaid
+flowchart TD
+  A["User sends a prompt"] --> B{"Simple terminal-only request?"}
+  B -- "Yes" --> C["Main thread runs the command"]
+  B -- "No" --> D["UserPromptSubmit hook checks the prompt"]
+  D --> E{"Engineering task?"}
+  E -- "No" --> F["No router marker"]
+  E -- "Yes" --> G["Inject CODEX_TEAM_ROUTER_ROUTE_REQUIRED"]
+  G --> H["Codex uses the codex-team-router skill"]
+  H --> I["Emit a visible routing receipt"]
+  I --> J{"Route level"}
+  J -- "trivial or small" --> K["Main thread handles the task"]
+  J -- "standard" --> L["Plan, execute, review"]
+  J -- "complex" --> M["Analyze, plan, review plan, execute, review"]
+  J -- "high_risk" --> N["Analyze, gated plan, scoped executors, review, verify"]
+  L --> O{"Explicit subagent authorization?"}
+  M --> O
+  N --> O
+  O -- "Yes" --> P["Spawn visible Codex App subagents when tools are available"]
+  O -- "No" --> Q["Stay in the main thread or ask before delegation"]
+  P --> R["Main thread integrates, verifies, and reports"]
+  Q --> R
+```
+
 ## What it does
 
 - Adds a `codex-team-router` skill for coding work: create, modify, fix,

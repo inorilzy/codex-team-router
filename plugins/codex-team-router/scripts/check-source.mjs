@@ -11,6 +11,10 @@ const checks = [
     args: [join(scriptDir, "route-fixtures.mjs")]
   },
   {
+    name: "repo hygiene",
+    args: [join(scriptDir, "repo-hygiene.mjs")]
+  },
+  {
     name: "source-only doctor",
     args: [join(scriptDir, "doctor.mjs"), "--source-only"]
   }

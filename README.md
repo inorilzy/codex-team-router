@@ -265,7 +265,10 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 ## Maintenance scripts
 
 - `scripts/check-source.mjs`: runs the source-tree checks used by GitHub
-  Actions. It currently runs route fixtures and source-only doctor.
+  Actions. It currently runs route fixtures, repo hygiene, and source-only
+  doctor.
+- `scripts/repo-hygiene.mjs`: checks README language split, marketplace and
+  plugin identity, skill identity, and absence of generated runtime state.
 - `scripts/route-fixtures.mjs`: runs hook classification fixtures in temporary
   workspaces and verifies marker injection, route classification, `status.json`,
   `task_board`, and `next_action`.
@@ -283,7 +286,7 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
   fallback, runtime status summary, install state, hook trust, and
   bundled/global custom-agent drift.
 
-The GitHub Actions workflow runs `route-fixtures.mjs` and
+The GitHub Actions workflow runs `route-fixtures.mjs`, `repo-hygiene.mjs`, and
 `doctor.mjs --source-only` through `check-source.mjs`, so pull requests can
 validate the source tree without needing a Codex App profile or local model
 catalog.

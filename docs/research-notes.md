@@ -60,6 +60,8 @@ Router without turning the plugin into a separate runtime.
   global, or explicit target installs.
 - Run doctor hook simulations in a temporary workspace so source checks do not
   leave `.codex/` state files in the repository.
+- Add a repo hygiene check to keep README language split, marketplace identity,
+  plugin identity, skill identity, and runtime artifact boundaries under CI.
 
 ## Not adopted yet
 

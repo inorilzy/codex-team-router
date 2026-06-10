@@ -26,6 +26,14 @@ Router without turning the plugin into a separate runtime.
   with different permissions.
 - [OpenAI Agents SDK orchestration](https://developers.openai.com/api/docs/guides/agents/orchestration):
   useful framing is choosing between handoffs and manager-owned agents-as-tools.
+- [AWS Labs CLI Agent Orchestrator](https://github.com/awslabs/cli-agent-orchestrator):
+  useful ideas include supervisor-worker coordination and isolated CLI agent
+  sessions.
+- [Warp multi-agent coding guide](https://docs.warp.dev/guides/agent-workflows/how-to-run-multiple-ai-coding-agents/):
+  useful framing includes worktree/tab/cloud isolation and clear task ownership.
+- [Ask149/orchestrator](https://github.com/Ask149/orchestrator): useful testing
+  ideas include cross-platform config path resolution, temporary file handling,
+  and secure permission defaults.
 
 ## Adopted now
 
@@ -50,6 +58,8 @@ Router without turning the plugin into a separate runtime.
   install smoke tests, and environment-specific doctor runs are separated.
 - Add a dry-run-first custom-agent template sync helper for project-local,
   global, or explicit target installs.
+- Run doctor hook simulations in a temporary workspace so source checks do not
+  leave `.codex/` state files in the repository.
 
 ## Not adopted yet
 

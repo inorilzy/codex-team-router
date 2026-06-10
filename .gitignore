@@ -1,0 +1,10 @@
+.DS_Store
+Thumbs.db
+node_modules/
+.codex/
+*.log
+tmp/
+temp/
+dist/
+coverage/
+plugins/**/references/model-profiles.generated.json

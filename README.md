@@ -1,0 +1,244 @@
+# Codex Team Router
+
+Codex Team Router is a Codex plugin for routing engineering tasks before work
+starts. It helps Codex decide whether a coding request should stay in the main
+thread, use a bounded executor, or use visible Codex App native subagents such
+as planner, executor, reviewer, explorer, and verifier.
+
+The public plugin id and skill id are both:
+
+```text
+codex-team-router
+```
+
+This repository is packaged as a Codex marketplace-style repo:
+
+```text
+codex-team-router/
+  .agents/plugins/marketplace.json
+  plugins/codex-team-router/
+    .codex-plugin/plugin.json
+    hooks/hooks.json
+    scripts/
+    skills/codex-team-router/
+```
+
+## What it does
+
+- Adds a `codex-team-router` skill for coding work: create, modify, fix,
+  refactor, review, validate, or build code.
+- Emits a visible routing receipt so you can tell whether the router was used:
+  `team_route=trivial|small|standard|parallel_read|complex|high_risk`.
+- Adds optional plugin hooks for:
+  `UserPromptSubmit`, `SessionStart`, `PreToolUse`, `SubagentStart`,
+  `SubagentStop`, and `Stop`.
+- Bundles custom-agent templates for:
+  `analyst`, `planner`, `plan-reviewer`, `executor`, `reviewer`, `explorer`,
+  and `verifier`.
+- Uses role model profiles:
+  `gpt-5.5`, `gpt-5.4`, and `gpt-5.4-mini`, with reasoning effort mapped per
+  role.
+- Includes a model catalog fallback checker. It reads
+  `~/.codex/cc-switch-model-catalog.json` first, then falls back to
+  `~/.codex/models_cache.json`.
+- Includes `scripts/doctor.mjs` for install, hook, model, and template health
+  checks.
+
+## What it does not do
+
+- It does not bypass Codex's subagent authorization boundary. The hook marker
+  `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` only means "route this request and emit a
+  receipt." It does not by itself authorize spawning subagents.
+- It is not a full oh-my-codex, OMO, or external multi-agent runtime. There is
+  no mailbox system, detached worktree pool, or external task runner.
+- It does not force every request into subagents. Simple terminal-only requests
+  should stay in the main thread.
+
+Official references:
+
+- [Codex subagents](https://developers.openai.com/codex/subagents)
+- [Codex hooks](https://developers.openai.com/codex/hooks)
+- [Build Codex plugins](https://developers.openai.com/codex/plugins/build)
+
+## Install from GitHub
+
+Add this repo as a marketplace source. Sparse checkout is recommended so Codex
+fetches only the marketplace file and this plugin:
+
+```powershell
+codex plugin marketplace add inorilzy/codex-team-router --sparse .agents/plugins --sparse plugins/codex-team-router
+codex plugin marketplace upgrade
+codex plugin add codex-team-router@codex-team-router
+```
+
+Then restart Codex App or open a new thread. Review and trust the hooks in the
+Codex App Hooks UI, or when Codex prompts you through `/hooks`.
+
+Check the install:
+
+```powershell
+codex plugin list
+node plugins/codex-team-router/scripts/doctor.mjs
+```
+
+If you are running the doctor from the installed plugin cache instead of a clone,
+run it from that cached plugin root:
+
+```powershell
+node scripts/doctor.mjs
+```
+
+## Local development install
+
+Clone the repo, then add the local repo root as a marketplace:
+
+```powershell
+git clone https://github.com/inorilzy/codex-team-router.git
+cd codex-team-router
+codex plugin marketplace add .
+codex plugin add codex-team-router@codex-team-router
+```
+
+After editing plugin code, run the validators:
+
+```powershell
+python $env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py plugins\codex-team-router\skills\codex-team-router
+python $env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py plugins\codex-team-router
+node plugins\codex-team-router\scripts\doctor.mjs
+```
+
+## Expected routing behavior
+
+The router classifies the current prompt by intent, domain, and complexity:
+
+```text
+intent: implement; domain: visual; authorization: implicit
+prompt_complexity: medium; signals: frontend/ui, complete artifact
+team_route: standard; execution: main; reason: no explicit subagent authorization
+```
+
+Typical routes:
+
+- `trivial`: simple questions and simple terminal commands.
+- `small`: tiny local edits where the main thread is enough.
+- `standard`: bounded features, straightforward UI, simple apps.
+- `parallel_read`: read-heavy scans or independent exploration.
+- `complex`: complete user-facing apps, games, multi-step changes, or review
+  work with meaningful risk.
+- `high_risk`: security-sensitive, destructive, migration, architecture, or
+  high-blast-radius work.
+
+For `standard`, `complex`, or `high_risk` routes, Codex should decompose the
+task before implementation. It should spawn visible native subagents only when
+the user explicitly asks for subagents, delegation, parallel work, or a
+planner/executor/reviewer workflow, or when a selected plugin prompt explicitly
+asks for subagents.
+
+## Test prompts
+
+These prompts are useful after install and hook trust:
+
+```text
+运行 git status --short，然后结束
+```
+
+Expected: no route-required marker. This is a simple terminal-only request.
+
+```text
+检查一下这个插件的各个方面，看看还有没有改进和优化的空间。
+```
+
+Expected: marker is injected, intent is `review`, domain is `infra`, and
+`team_route=complex`.
+
+```text
+创建一个简单的 HTML 计数器页面。
+```
+
+Expected: marker is injected and `team_route=standard`.
+
+```text
+创建一个愤怒的小鸟小游戏，单 HTML 文件。
+```
+
+Expected: marker is injected and `team_route=complex`, because the prompt
+implies projectile motion, collision, scoring, and game state.
+
+```text
+Use planner/executor/reviewer subagents to create a small HTML app.
+```
+
+Expected: explicit subagent authorization. Codex may use visible native
+subagents when the tools are available.
+
+## Hooks and environment variables
+
+The bundled plugin hooks are intentionally minimal:
+
+- `UserPromptSubmit`: detects likely engineering prompts and injects routing
+  context.
+- `SessionStart`: writes team-router health state.
+- `PreToolUse`: warns before implementation-like tools when a routed prompt has
+  not produced a visible routing decision yet.
+- `SubagentStart` and `SubagentStop`: record child-agent lifecycle evidence.
+- `Stop`: records completion gate state and warns about missing validation
+  evidence.
+
+Default mode is warn-only. Optional environment variables:
+
+```text
+CODEX_TEAM_ROUTER_SUBAGENT_GATE=warn|enforce|off
+CODEX_TEAM_ROUTER_HOOK_MODE=warn|enforce
+```
+
+Legacy aliases are also accepted:
+
+```text
+SQUAD_SUBAGENT_GATE
+SQUAD_HOOK_MODE
+```
+
+## Model profiles
+
+The bundled defaults are:
+
+```text
+smartest_deep   gpt-5.5       xhigh
+smartest_review gpt-5.5       high
+smart_code      gpt-5.4       high
+smart_verify    gpt-5.4       medium
+fast_scan       gpt-5.4-mini  low
+```
+
+Refresh the local model visibility report:
+
+```powershell
+node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-team-router\skills\codex-team-router\references\model-profiles.generated.json
+```
+
+The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
+`source`, and warnings when local catalogs do not expose a documented default.
+
+## Troubleshooting
+
+Check whether Codex sees the marketplace and plugin:
+
+```powershell
+codex plugin marketplace list
+codex plugin list
+```
+
+If the plugin is installed but hooks do not run, restart Codex App or open a
+new thread, then trust the changed hooks in the Hooks UI or through `/hooks`.
+
+If `doctor.mjs` says the plugin is not installed, it is safe for a source clone
+before installation. After installation it should show the plugin as installed
+and enabled.
+
+If model detection only sees cc-switch proxy models, make sure
+`~/.codex/models_cache.json` exists. The refresh script falls back to that file
+when `~/.codex/cc-switch-model-catalog.json` does not contain the GPT defaults.
+
+## License
+
+MIT

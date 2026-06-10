@@ -1,0 +1,370 @@
+{
+  "version": 1,
+  "name": "codex-team-router",
+  "inspired_by": {
+    "project": "oh-my-openagent",
+    "ideas_used": [
+      "canonical role order",
+      "team spec separate from runtime state",
+      "member eligibility rules",
+      "role/category based dispatch instead of model picking",
+      "intent gate before routing",
+      "default delegation bias except for super-simple local work",
+      "dependency graph and parallel execution waves for plans"
+    ]
+  },
+  "limits": {
+    "max_parallel_agents": 4,
+    "max_agents_per_run": 8,
+    "prefer_fork_context": false,
+    "prefer_csv_fanout_for_uniform_batches": true
+  },
+  "official_config": {
+    "config_table": "[agents]",
+    "max_threads_default": 6,
+    "max_depth_default": 1,
+    "job_max_runtime_seconds_default": 1800,
+    "notes": [
+      "Check global [agents] settings before broad fan-out.",
+      "Keep max_depth at the default unless recursive delegation is explicitly requested.",
+      "Use spawn_agents_on_csv for large uniform batches with one narrow task per row."
+    ]
+  },
+  "hooks": {
+    "optional": true,
+    "template": "references/hooks.example.json",
+    "helper": "assets/hooks/codex-team-router-hook.mjs",
+    "project_install_path": ".codex/hooks/codex-team-router-hook.mjs",
+    "state_dir": ".codex/team-router",
+    "default_mode": "warn"
+  },
+  "model_profiles": {
+    "smartest_deep": {
+      "description": "Hard planning, ambiguity analysis, and plan gates.",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "xhigh"
+    },
+    "smartest_review": {
+      "description": "Independent review where correctness matters more than latency.",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "high"
+    },
+    "smart_code": {
+      "description": "Implementation and broad coding work.",
+      "model": "gpt-5.4",
+      "model_reasoning_effort": "high"
+    },
+    "smart_verify": {
+      "description": "Validation and evidence inspection.",
+      "model": "gpt-5.4",
+      "model_reasoning_effort": "medium"
+    },
+    "fast_scan": {
+      "description": "Read-heavy scans, exploration, and lightweight fan-out.",
+      "model": "gpt-5.4-mini",
+      "model_reasoning_effort": "low"
+    }
+  },
+  "prompt_complexity": {
+    "analyze_before_route": true,
+    "single_file_is_scope_not_difficulty": true,
+    "intent_gate": {
+      "answer": "Explanation, design opinion, or conceptual response without requested edits.",
+      "investigate": "Look into, check, compare, or diagnose without explicit fix authorization.",
+      "implement": "Build, create, add, write, modify, or change code or artifacts.",
+      "fix": "Broken behavior, error message, failing test, or regression.",
+      "review": "Code review, plan review, QA review, or validation request.",
+      "plan": "Planning, breakdown, or execution strategy request.",
+      "terminal": "Simple shell command or status check only."
+    },
+    "domains": {
+      "visual": "UI, CSS, layout, animation, frontend components, visual polish.",
+      "game": "Gameplay, physics, collision, scoring, levels, input loops.",
+      "logic": "Algorithms, architecture, state machines, business logic.",
+      "writing": "Docs, prose, README, technical writing.",
+      "git": "Commits, branches, diffs, merge/rebase/release notes.",
+      "data": "SQL, spreadsheets, data transforms, schemas, reports.",
+      "infra": "CI, deployment, scripts, auth, permissions, services.",
+      "general": "None of the above or not yet clear."
+    },
+    "self_gate": {
+      "allow_main_thread_only_when_all_hold": [
+        "Single-step local task.",
+        "Known file, command, or explanation target.",
+        "No meaningful product, design, or architecture judgment.",
+        "No cross-file dependency.",
+        "Roughly less than 10 lines of obvious change if editing."
+      ],
+      "single_file_note": "One requested output file limits write scope; it does not make a complex app or game simple."
+    },
+    "levels": {
+      "low": "Simple questions, tiny commands, copy edits, style tweaks, and very small isolated bug fixes.",
+      "medium": "Bounded single features, straightforward single-file UI, simple arcade mechanics, and small CRUD flows.",
+      "high": "Complete user-facing apps or games, multiple interacting states, physics, collision, drag interactions, timers, scoring, levels, generated assets, nontrivial validation, or more than one meaningful subsystem.",
+      "very_high": "Ambiguous architecture, security-sensitive changes, destructive operations, large refactors, migrations, cross-service work, or complex concurrency/data-loss risk."
+    },
+    "game_rules": [
+      "Classify games by mechanics rather than file count.",
+      "Basic snake, pong, clicker, memory, and tic-tac-toe can remain small when the user asks for a quick version.",
+      "New playable games with several mechanics are at least complex.",
+      "Physics or collision games are complex by default.",
+      "Angry Birds-style tasks are complex because they imply slingshot aiming, projectile motion, collision response, destructible or moving targets, scoring, level state, and restart/win/lose flow."
+    ],
+    "complexity_to_execution": {
+      "low": "main",
+      "medium": "subagents_planner_executor_reviewer",
+      "high": "subagents_analyst_planner_plan_reviewer_executor_reviewer",
+      "very_high": "subagents_analyst_planner_plan_reviewer_executors_reviewer_verifier"
+    },
+    "decomposition_required_for": [
+      "medium",
+      "high",
+      "very_high"
+    ],
+    "decomposition_shape": [
+      "surfaces",
+      "subtasks",
+      "dependencies",
+      "parallelism",
+      "validation"
+    ],
+    "authorization": "An explicit request to use Codex Team Router for a coding task authorizes complexity-based delegation. Explicit subagent, delegate, parallel, or planner/executor/reviewer wording also authorizes spawning. If the skill was selected only implicitly and tool policy requires explicit delegation authorization, ask before spawning."
+  },
+  "task_routes": {
+    "trivial": {
+      "description": "Simple questions, tiny edits, simple terminal commands, or explanation-only work.",
+      "spawn": false,
+      "roles": [],
+      "model_profiles": [],
+      "verification": "Answer directly or run the simple command; do not create team-router overhead."
+    },
+    "small": {
+      "description": "Low prompt complexity where the self gate passes.",
+      "spawn": false,
+      "roles": [],
+      "model_profiles": [],
+      "verification": "Main thread verifies focused changes."
+    },
+    "standard": {
+      "description": "Medium prompt complexity: bounded single features, straightforward single-file UI, simple arcade mechanics, and small CRUD flows.",
+      "spawn": true,
+      "roles": [
+        "planner",
+        "executor",
+        "reviewer"
+      ],
+      "model_profiles": [
+        "smartest_deep",
+        "smart_code",
+        "smartest_review"
+      ],
+      "verification": "Planner defines the bounded approach, executor implements, reviewer gates, main thread verifies."
+    },
+    "parallel_read": {
+      "description": "Read-heavy exploration, large-file review, log triage, documentation slicing, or uniform scan work.",
+      "spawn": true,
+      "roles": [
+        "explorer"
+      ],
+      "model_profiles": [
+        "fast_scan"
+      ],
+      "verification": "Main thread synthesizes returned summaries and checks cited evidence."
+    },
+    "complex": {
+      "description": "High prompt complexity: multi-step implementation, complete user-facing app or game, complex single-file interactive artifact, multi-file work, physics/collision gameplay, product/design judgment, nontrivial validation, or likely >50 lines of coherent new work.",
+      "spawn": true,
+      "roles": [
+        "analyst",
+        "planner",
+        "plan-reviewer",
+        "executor",
+        "reviewer"
+      ],
+      "model_profiles": [
+        "smartest_deep",
+        "smart_code",
+        "smartest_review"
+      ],
+      "verification": "Planner defines scope, executor implements, reviewer gates, main thread validates."
+    },
+    "high_risk": {
+      "description": "Ambiguous, security-sensitive, destructive, cross-boundary, architecture-heavy, or high-blast-radius work.",
+      "spawn": true,
+      "roles": [
+        "analyst",
+        "planner",
+        "plan-reviewer",
+        "executor",
+        "reviewer",
+        "verifier"
+      ],
+      "model_profiles": [
+        "smartest_deep",
+        "smart_code",
+        "smartest_review",
+        "smart_verify"
+      ],
+      "verification": "Run analysis and plan gates before implementation; require independent review and validation evidence before completion."
+    }
+  },
+  "canonical_order": [
+    "analyst",
+    "planner",
+    "plan-reviewer",
+    "executor",
+    "reviewer",
+    "verifier"
+  ],
+  "roles": {
+    "analyst": {
+      "display_name": "Analyst",
+      "custom_agent": "analyst",
+      "custom_agent_file": ".codex/agents/analyst.toml",
+      "native_agent_type": "worker",
+      "model_profile": "smartest_deep",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "xhigh",
+      "mode": "pre_planning_analysis",
+      "eligibility": "conditional",
+      "write_scope_policy": "none",
+      "reuse_policy": "fresh_per_ambiguous_request",
+      "close_policy": "after_gap_report",
+      "responsibilities": [
+        "detect contradictions and ambiguity",
+        "identify missing constraints",
+        "surface execution risks before planning",
+        "recommend safe assumptions or user decisions"
+      ]
+    },
+    "planner": {
+      "display_name": "Planner",
+      "custom_agent": "planner",
+      "custom_agent_file": ".codex/agents/planner.toml",
+      "native_agent_type": "default",
+      "model_profile": "smartest_deep",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "xhigh",
+      "mode": "planning",
+      "eligibility": "eligible",
+      "write_scope_policy": "none",
+      "reuse_policy": "same_task_cluster",
+      "close_policy": "after_run_or_when_idle",
+      "responsibilities": [
+        "define task boundaries",
+        "split worker responsibilities",
+        "assign owned files",
+        "define validation plan",
+        "surface risks and assumptions"
+      ]
+    },
+    "plan-reviewer": {
+      "display_name": "Plan Reviewer",
+      "custom_agent": "plan-reviewer",
+      "custom_agent_file": ".codex/agents/plan-reviewer.toml",
+      "native_agent_type": "worker",
+      "model_profile": "smartest_deep",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "xhigh",
+      "mode": "plan_review",
+      "eligibility": "conditional",
+      "write_scope_policy": "none",
+      "reuse_policy": "fresh_per_plan_gate",
+      "close_policy": "after_plan_gate",
+      "responsibilities": [
+        "verify plan references",
+        "check task executability",
+        "check dependency sanity",
+        "gate the plan with okay, iterate, or reject"
+      ]
+    },
+    "executor": {
+      "display_name": "Executor",
+      "custom_agent": "executor",
+      "custom_agent_file": ".codex/agents/executor.toml",
+      "native_agent_type": "worker",
+      "model_profile": "smart_code",
+      "model": "gpt-5.4",
+      "model_reasoning_effort": "high",
+      "mode": "implementation",
+      "eligibility": "eligible",
+      "write_scope_policy": "owned_files_required",
+      "reuse_policy": "same_write_scope",
+      "close_policy": "after_review_accepts",
+      "responsibilities": [
+        "edit files directly within owned scope",
+        "avoid reverting unrelated workspace changes",
+        "run local validation when practical",
+        "report changed paths and open issues"
+      ]
+    },
+    "reviewer": {
+      "display_name": "Reviewer",
+      "custom_agent": "reviewer",
+      "custom_agent_file": ".codex/agents/reviewer.toml",
+      "native_agent_type": "worker",
+      "model_profile": "smartest_review",
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "high",
+      "mode": "review",
+      "eligibility": "eligible",
+      "write_scope_policy": "none",
+      "reuse_policy": "fresh_per_gate",
+      "close_policy": "after_review",
+      "responsibilities": [
+        "review against the task contract",
+        "return findings first",
+        "identify blocking issues",
+        "call out missing validation or evidence"
+      ]
+    },
+    "explorer": {
+      "display_name": "Explorer",
+      "custom_agent": "explorer",
+      "custom_agent_file": ".codex/agents/explorer.toml",
+      "native_agent_type": "explorer",
+      "model_profile": "fast_scan",
+      "model": "gpt-5.4-mini",
+      "model_reasoning_effort": "low",
+      "mode": "research",
+      "eligibility": "conditional",
+      "write_scope_policy": "none",
+      "reuse_policy": "related_questions",
+      "close_policy": "after_answer",
+      "responsibilities": [
+        "answer narrow codebase questions",
+        "read files without editing",
+        "summarize relevant paths and constraints"
+      ]
+    },
+    "verifier": {
+      "display_name": "Verifier",
+      "custom_agent": "verifier",
+      "custom_agent_file": ".codex/agents/verifier.toml",
+      "native_agent_type": "worker",
+      "model_profile": "smart_verify",
+      "model": "gpt-5.4",
+      "model_reasoning_effort": "medium",
+      "mode": "validation",
+      "eligibility": "conditional",
+      "write_scope_policy": "none",
+      "reuse_policy": "fresh_when_expensive",
+      "close_policy": "after_validation",
+      "responsibilities": [
+        "run independent validation when main-thread verification is expensive",
+        "report commands and exact results",
+        "avoid changing files"
+      ]
+    }
+  },
+  "hard_reject": [
+    {
+      "role_id": "coordinator",
+      "reason": "The main thread is always the coordinator in Codex App native mode."
+    },
+    {
+      "role_id": "unbounded_executor",
+      "reason": "Executors must have an explicit owned file or directory scope."
+    }
+  ]
+}

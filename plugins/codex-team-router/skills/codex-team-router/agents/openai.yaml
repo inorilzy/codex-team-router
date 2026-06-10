@@ -1,0 +1,4 @@
+interface:
+  display_name: Codex Team Router
+  short_description: Route coding tasks before deciding main-thread or visible subagent execution.
+  default_prompt: Route this coding task with Codex Team Router before implementing.

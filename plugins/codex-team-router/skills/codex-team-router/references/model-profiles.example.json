@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "source": "official-codex-docs-defaults",
+  "profiles": {
+    "smartest_deep": {
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "xhigh"
+    },
+    "smartest_review": {
+      "model": "gpt-5.5",
+      "model_reasoning_effort": "high"
+    },
+    "smart_code": {
+      "model": "gpt-5.4",
+      "model_reasoning_effort": "high"
+    },
+    "smart_verify": {
+      "model": "gpt-5.4",
+      "model_reasoning_effort": "medium"
+    },
+    "fast_scan": {
+      "model": "gpt-5.4-mini",
+      "model_reasoning_effort": "low"
+    }
+  }
+}

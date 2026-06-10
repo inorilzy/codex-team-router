@@ -1,0 +1,87 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/codex-team-router-hook.mjs UserPromptSubmit",
+            "commandWindows": "node .codex\\hooks\\codex-team-router-hook.mjs UserPromptSubmit",
+            "timeout": 30,
+            "statusMessage": "Checking whether this prompt needs team routing"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/codex-team-router-hook.mjs SessionStart",
+            "commandWindows": "node .codex\\hooks\\codex-team-router-hook.mjs SessionStart",
+            "timeout": 30,
+            "statusMessage": "Checking codex team router state"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/codex-team-router-hook.mjs PreToolUse",
+            "commandWindows": "node .codex\\hooks\\codex-team-router-hook.mjs PreToolUse",
+            "timeout": 30,
+            "statusMessage": "Checking team routing before tool use"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/codex-team-router-hook.mjs SubagentStart",
+            "commandWindows": "node .codex\\hooks\\codex-team-router-hook.mjs SubagentStart",
+            "timeout": 30,
+            "statusMessage": "Recording subagent start"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/codex-team-router-hook.mjs SubagentStop",
+            "commandWindows": "node .codex\\hooks\\codex-team-router-hook.mjs SubagentStop",
+            "timeout": 30,
+            "statusMessage": "Recording subagent stop"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/codex-team-router-hook.mjs Stop",
+            "commandWindows": "node .codex\\hooks\\codex-team-router-hook.mjs Stop",
+            "timeout": 30,
+            "statusMessage": "Checking team-router completion gate"
+          }
+        ]
+      }
+    ]
+  }
+}

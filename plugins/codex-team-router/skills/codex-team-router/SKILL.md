@@ -444,6 +444,9 @@ Default plugin hook responsibilities:
 - `SubagentStop`: mark the matching running agent complete when possible.
 - `Stop`: write `.codex/team-router/completion-gate.json` and warn when
   agents are still running or changed files lack validation evidence.
+Every state write also refreshes `.codex/team-router/status.json`, a compact
+human-readable summary containing the current route, prompt preview, agent
+counts, validation evidence count, warning count, task board, and next action.
 
 Optional project-local audit hooks can add `PermissionRequest` and `PostToolUse`
 for stricter risky-command checks and

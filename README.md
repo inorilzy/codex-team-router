@@ -88,6 +88,9 @@ Official references:
 - [Codex hooks](https://developers.openai.com/codex/hooks)
 - [Build Codex plugins](https://developers.openai.com/codex/plugins/build)
 
+Related project notes and adopted ideas are tracked in
+[docs/research-notes.md](docs/research-notes.md).
+
 ## Install from GitHub
 
 Add this repo as a marketplace source. Sparse checkout is recommended so Codex
@@ -211,6 +214,10 @@ The bundled plugin hooks are intentionally minimal:
 - `SubagentStart` and `SubagentStop`: record child-agent lifecycle evidence.
 - `Stop`: records completion gate state and warns about missing validation
   evidence.
+
+The hook state is written under `.codex/team-router/`. The compact
+`status.json` file is the quickest way to inspect the current route, agent
+counts, validation evidence count, warnings, and the next suggested action.
 
 Default mode is warn-only. Optional environment variables:
 

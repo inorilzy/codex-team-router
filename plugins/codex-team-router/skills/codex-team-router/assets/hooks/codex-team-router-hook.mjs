@@ -10,6 +10,7 @@ const statePath = join(routerDir, "current-run.json");
 const auditPath = join(routerDir, "audit.jsonl");
 const healthPath = join(routerDir, "health.json");
 const gatePath = join(routerDir, "completion-gate.json");
+const statusPath = join(routerDir, "status.json");
 const mode = process.env.CODEX_TEAM_ROUTER_HOOK_MODE || process.env.SQUAD_HOOK_MODE || "warn";
 const subagentGate = process.env.CODEX_TEAM_ROUTER_SUBAGENT_GATE || process.env.SQUAD_SUBAGENT_GATE || "warn";
 const routeReminderTools = /(?:shell|exec|command|apply_patch|edit|write|read|grep|rg|find|search|view|open|multi_agent|spawn)/i;
@@ -79,8 +80,105 @@ function loadState() {
   });
 }
 
+function countAgents(state, status) {
+  return (state.agents || []).filter((agent) => agent.status === status).length;
+}
+
+function routeClassification(state) {
+  return state.route_required?.classification || {};
+}
+
+function routeLevel(state) {
+  const classification = routeClassification(state);
+  return classification.team_route || classification.squad_route || null;
+}
+
+function deriveNextAction(state) {
+  const routeRequired = state.route_required?.required === true;
+  const route = routeLevel(state);
+  const runningAgents = countAgents(state, "running");
+  const validationCount = (state.validation_evidence || []).length;
+
+  if (!routeRequired) {
+    return "No team-router action is required for the current prompt.";
+  }
+  if (runningAgents > 0) {
+    return "Wait for running subagents, then integrate their results in the main thread.";
+  }
+  if (route === "standard" || route === "complex" || route === "high_risk") {
+    if (!hasSubagentStarted(state)) {
+      return "Emit the routing receipt; spawn subagents only if explicitly authorized, otherwise continue in the main thread or ask before delegation.";
+    }
+    if (validationCount === 0) {
+      return "Collect validation evidence before claiming completion.";
+    }
+  }
+  return "Continue from the visible routing receipt and keep the main thread responsible for final verification.";
+}
+
+function buildTaskBoard(state) {
+  const routeRequired = state.route_required?.required === true;
+  const route = routeLevel(state);
+  const delegatedRoute = route === "standard" || route === "complex" || route === "high_risk";
+  const agentsStarted = hasSubagentStarted(state);
+  const validationCount = (state.validation_evidence || []).length;
+
+  return [
+    {
+      item: "Classify prompt",
+      status: routeRequired ? "completed" : "not_required"
+    },
+    {
+      item: "Emit routing receipt",
+      status: routeRequired ? "pending_model_action" : "not_required"
+    },
+    {
+      item: "Start authorized subagents",
+      status: delegatedRoute ? (agentsStarted ? "completed" : "optional_pending_authorization") : "not_required"
+    },
+    {
+      item: "Collect validation evidence",
+      status: validationCount > 0 ? "completed" : "pending_when_files_change"
+    }
+  ];
+}
+
+function writeStatus(state) {
+  const classification = routeClassification(state);
+  const agents = state.agents || [];
+  const warnings = state.warnings || [];
+  const validationEvidence = state.validation_evidence || [];
+  const hookEvents = state.hook_events || [];
+
+  writeJson(statusPath, {
+    version: 1,
+    updated_at: now(),
+    run_id: state.run_id || null,
+    status: state.status || "running",
+    route_required: state.route_required?.required === true,
+    route: routeLevel(state),
+    intent: classification.intent || null,
+    domain: classification.domain || null,
+    prompt_complexity: classification.prompt_complexity || null,
+    execution: classification.execution || null,
+    prompt_preview: state.route_required?.prompt_preview || null,
+    agents: {
+      total: agents.length,
+      running: countAgents(state, "running"),
+      completed: countAgents(state, "completed")
+    },
+    validation_evidence_count: validationEvidence.length,
+    warning_count: warnings.length,
+    last_warning: warnings.at(-1)?.message || null,
+    last_event: hookEvents.at(-1) || null,
+    task_board: buildTaskBoard(state),
+    next_action: deriveNextAction(state)
+  });
+}
+
 function saveState(state) {
   writeJson(statePath, state);
+  writeStatus(state);
 }
 
 function detectTool(payload) {
@@ -234,6 +332,7 @@ function userPromptSubmit(payload) {
   const prompt = String(detectPrompt(payload) || "");
   if (!isEngineeringPrompt(prompt)) {
     const state = loadState();
+    state.status = "no_route_required";
     state.route_required = { required: false, cleared_at: now(), source: "UserPromptSubmit" };
     state.pre_tool_route_reminder_sent = false;
     state.hook_events.push({ event, at: now(), route_required: false });
@@ -243,6 +342,7 @@ function userPromptSubmit(payload) {
 
   const classification = classifyPrompt(prompt);
   const state = loadState();
+  state.status = "routing_required";
   state.route_required = {
     required: true,
     detected_at: now(),
@@ -292,6 +392,7 @@ function sessionStart(payload) {
   writeJson(healthPath, health);
 
   const state = loadState();
+  state.status = "session_started";
   state.hook_events.push({ event, at: now(), source: health.source });
   state.last_health = health;
   saveState(state);
@@ -300,6 +401,7 @@ function sessionStart(payload) {
 function subagentStart(payload) {
   const state = loadState();
   const agentType = detectTool(payload) || "unknown";
+  state.status = "agents_running";
   state.hook_events.push({ event, at: now(), agent_type: agentType });
   state.agents.push({
     role_id: payload.role_id || agentType,
@@ -330,6 +432,7 @@ function subagentStop(payload) {
     agent.completed_at = now();
     agent.last_result_summary = payload.summary || payload.result || null;
   }
+  state.status = state.agents.some((item) => item.status === "running") ? "agents_running" : "agents_completed";
 
   state.hook_events.push({ event, at: now(), agent_type: agentType, agent_id: agentId });
   saveState(state);
@@ -339,6 +442,7 @@ function preToolUse(payload) {
   const tool = detectTool(payload);
   const command = detectCommand(payload);
   const state = loadState();
+  if (!state.status || state.status === "running") state.status = "tool_use_observed";
   const routeRequired = state.route_required?.required === true;
   const shouldGateSubagent = subagentGate !== "off" && needsSubagentBeforeWrite(state);
 
@@ -457,6 +561,7 @@ function stop(payload) {
   };
 
   writeJson(gatePath, gate);
+  state.status = warnings.length > 0 ? "completed_with_warnings" : "completed";
   state.hook_events.push({ event, at: now(), warnings });
   state.last_completion_gate = gate;
   saveState(state);

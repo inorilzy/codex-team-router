@@ -74,6 +74,8 @@ flowchart TD
 - [Codex hooks](https://developers.openai.com/codex/hooks)
 - [Build Codex plugins](https://developers.openai.com/codex/plugins/build)
 
+相关项目调研和已采纳思路记录在 [docs/research-notes.md](docs/research-notes.md)。
+
 ## 从 GitHub 安装
 
 把这个仓库添加为 marketplace source。建议使用 sparse checkout，这样 Codex 只会拉取 marketplace 文件和这个插件：
@@ -182,6 +184,8 @@ Use planner/executor/reviewer subagents to create a small HTML app.
 - `PreToolUse`：当已路由的 prompt 还没有输出可见路由决策时，在实现类工具调用前提醒。
 - `SubagentStart` 和 `SubagentStop`：记录 child-agent 生命周期证据。
 - `Stop`：记录 completion gate 状态，并在缺少验证证据时提醒。
+
+hook 状态会写入 `.codex/team-router/`。其中 `status.json` 是最快的检查入口，里面会显示当前 route、agent 计数、验证证据数量、warning 数量和下一步建议。
 
 默认模式是 warn-only。可选环境变量：
 

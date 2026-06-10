@@ -21,6 +21,7 @@ const agentTemplateDir = join(skillRoot, "assets", "codex-agents");
 const globalAgentsDir = join(codexHome, "agents");
 const pluginName = "codex-team-router";
 const routeMarker = "CODEX_TEAM_ROUTER_ROUTE_REQUIRED";
+const runtimeStatusPath = join(process.cwd(), ".codex", "team-router", "status.json");
 
 const results = [];
 
@@ -242,6 +243,20 @@ function checkHookSimulation() {
   record(preToolOutput.includes("explicit user authorization") ? "pass" : "fail", "PreToolUse reminder preserves explicit subagent authorization boundary");
 }
 
+function checkRuntimeStatusSummary() {
+  if (!existsSync(runtimeStatusPath)) {
+    record("fail", "Hook writes runtime status summary", runtimeStatusPath);
+    return;
+  }
+
+  const status = readJson(runtimeStatusPath);
+  if (!status) return;
+
+  record(status.route === "standard" ? "pass" : "fail", "Runtime status summary records the latest route", `route=${status.route}`);
+  record(Array.isArray(status.task_board) && status.task_board.length > 0 ? "pass" : "fail", "Runtime status summary includes task_board");
+  record(typeof status.next_action === "string" && status.next_action.length > 0 ? "pass" : "fail", "Runtime status summary includes next_action", status.next_action || "");
+}
+
 function checkModelFallback() {
   const tempDir = mkdtempSync(join(tmpdir(), "codex-team-router-doctor-"));
   const outputPath = join(tempDir, "model-profiles.generated.json");
@@ -326,6 +341,7 @@ checkHooksJson();
 checkConfig();
 checkPluginCli();
 checkHookSimulation();
+checkRuntimeStatusSummary();
 checkModelFallback();
 checkAgentTemplates();
 
@@ -334,6 +350,14 @@ const warnCount = results.filter((item) => item.level === "warn").length;
 
 console.log("");
 console.log(`Summary: ${failCount} fail(s), ${warnCount} warning(s), ${results.length} check(s).`);
+
+if (warnCount > 0) {
+  console.log("");
+  console.log("Next steps for warnings:");
+  console.log("- If the plugin is not installed, add this marketplace and run `codex plugin add codex-team-router@codex-team-router`.");
+  console.log("- If trusted hook entries are missing, restart Codex App or open a new thread, then review and trust the plugin hooks.");
+  console.log("- If global custom agents drift from bundled templates, copy the desired templates from `skills/codex-team-router/assets/codex-agents/` to `~/.codex/agents/`.");
+}
 
 if (failCount > 0) {
   process.exit(1);

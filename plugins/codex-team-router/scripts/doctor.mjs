@@ -14,6 +14,8 @@ const manifestPath = join(pluginRoot, ".codex-plugin", "plugin.json");
 const hooksPath = join(pluginRoot, "hooks", "hooks.json");
 const hookScriptPath = join(pluginRoot, "scripts", "codex-team-router-hook.mjs");
 const modelScriptPath = join(pluginRoot, "scripts", "refresh-model-profiles.mjs");
+const routeFixturesScriptPath = join(pluginRoot, "scripts", "route-fixtures.mjs");
+const smokeInstallScriptPath = join(pluginRoot, "scripts", "smoke-install.mjs");
 const skillRoot = join(pluginRoot, "skills", "codex-team-router");
 const assetHookScriptPath = join(skillRoot, "assets", "hooks", "codex-team-router-hook.mjs");
 const assetModelScriptPath = join(skillRoot, "assets", "scripts", "refresh-model-profiles.mjs");
@@ -95,6 +97,8 @@ function checkFiles() {
   record(existsSync(manifestPath) ? "pass" : "fail", "Plugin manifest exists", manifestPath);
   record(existsSync(hooksPath) ? "pass" : "fail", "Plugin hooks.json exists", hooksPath);
   record(existsSync(hookScriptPath) ? "pass" : "fail", "Hook script exists", hookScriptPath);
+  record(existsSync(routeFixturesScriptPath) ? "pass" : "fail", "Route fixture script exists", routeFixturesScriptPath);
+  record(existsSync(smokeInstallScriptPath) ? "pass" : "fail", "Smoke install script exists", smokeInstallScriptPath);
   record(existsSync(assetHookScriptPath) ? "pass" : "fail", "Asset hook script exists", assetHookScriptPath);
   record(existsSync(assetModelScriptPath) ? "pass" : "fail", "Asset model refresh script exists", assetModelScriptPath);
   if (existsSync(hookScriptPath) && existsSync(assetHookScriptPath)) {

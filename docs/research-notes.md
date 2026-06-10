@@ -39,6 +39,10 @@ Router without turning the plugin into a separate runtime.
   action without reading the full audit log.
 - Add doctor checks for the runtime status summary and print actionable next
   steps for install/trust/template warnings.
+- Add hook route fixtures so classifier changes can be regression tested without
+  starting Codex App.
+- Add local marketplace smoke install so packaging changes can be tested in a
+  temporary `CODEX_HOME`.
 
 ## Not adopted yet
 
@@ -53,9 +57,9 @@ Router without turning the plugin into a separate runtime.
 
 ## Candidate backlog
 
-- Add a `scripts/smoke-install.mjs` helper for temporary `CODEX_HOME`
-  marketplace install tests.
-- Add richer route fixtures for hook classification regression tests.
+- Add a CI workflow that runs validation, route fixtures, doctor, and smoke
+  install where the Codex CLI is available.
+- Add richer route fixtures for more edge-case prompt categories.
 - Add optional project-local agent template sync commands instead of only doctor
   warnings.
 - Add a short comparison section to README once the public API and install path

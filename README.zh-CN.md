@@ -117,7 +117,14 @@ codex plugin add codex-team-router@codex-team-router
 ```powershell
 python $env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py plugins\codex-team-router\skills\codex-team-router
 python $env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py plugins\codex-team-router
+node plugins\codex-team-router\scripts\route-fixtures.mjs
 node plugins\codex-team-router\scripts\doctor.mjs
+```
+
+发布插件变更前，建议用临时 `CODEX_HOME` 跑本地 marketplace 安装冒烟测试：
+
+```powershell
+node plugins\codex-team-router\scripts\smoke-install.mjs
 ```
 
 ## 预期路由行为
@@ -220,6 +227,12 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 ```
 
 生成的文件会记录 `catalog_path`、`catalog_paths_checked`、每个 profile 的 `source`，以及当本地 catalog 没暴露默认模型时的 warning。
+
+## 维护脚本
+
+- `scripts/route-fixtures.mjs`：在临时 workspace 中运行 hook 分类 fixtures，检查 marker 注入、route 分类、`status.json`、`task_board` 和 `next_action`。
+- `scripts/smoke-install.mjs`：创建临时 `CODEX_HOME`，添加本地 repo marketplace，安装 `codex-team-router@codex-team-router`，并检查 Codex 是否显示 installed 和 enabled。
+- `scripts/doctor.mjs`：检查插件结构、hook 模拟、模型 catalog fallback、runtime status summary，以及 bundled/global custom-agent 是否漂移。
 
 ## 故障排查
 

@@ -135,7 +135,15 @@ After editing plugin code, run the validators:
 ```powershell
 python $env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py plugins\codex-team-router\skills\codex-team-router
 python $env:USERPROFILE\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py plugins\codex-team-router
+node plugins\codex-team-router\scripts\route-fixtures.mjs
 node plugins\codex-team-router\scripts\doctor.mjs
+```
+
+Before publishing plugin changes, run a local marketplace install smoke test in
+a temporary `CODEX_HOME`:
+
+```powershell
+node plugins\codex-team-router\scripts\smoke-install.mjs
 ```
 
 ## Expected routing behavior
@@ -253,6 +261,17 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 
 The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 `source`, and warnings when local catalogs do not expose a documented default.
+
+## Maintenance scripts
+
+- `scripts/route-fixtures.mjs`: runs hook classification fixtures in temporary
+  workspaces and verifies marker injection, route classification, `status.json`,
+  `task_board`, and `next_action`.
+- `scripts/smoke-install.mjs`: creates a temporary `CODEX_HOME`, adds the local
+  repo marketplace, installs `codex-team-router@codex-team-router`, and checks
+  that Codex reports it as installed and enabled.
+- `scripts/doctor.mjs`: checks plugin structure, hook simulation, model catalog
+  fallback, runtime status summary, and bundled/global custom-agent drift.
 
 ## Troubleshooting
 

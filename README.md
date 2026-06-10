@@ -1,5 +1,7 @@
 # Codex Team Router
 
+Chinese version: [README.zh-CN.md](README.zh-CN.md).
+
 Codex Team Router is a Codex plugin for routing engineering tasks before work
 starts. It helps Codex decide whether a coding request should stay in the main
 thread, use a bounded executor, or use visible Codex App native subagents such
@@ -139,26 +141,26 @@ asks for subagents.
 These prompts are useful after install and hook trust:
 
 ```text
-运行 git status --short，然后结束
+Run git status --short and then stop.
 ```
 
 Expected: no route-required marker. This is a simple terminal-only request.
 
 ```text
-检查一下这个插件的各个方面，看看还有没有改进和优化的空间。
+Review this plugin and find improvements.
 ```
 
 Expected: marker is injected, intent is `review`, domain is `infra`, and
 `team_route=complex`.
 
 ```text
-创建一个简单的 HTML 计数器页面。
+Create a simple HTML counter page.
 ```
 
 Expected: marker is injected and `team_route=standard`.
 
 ```text
-创建一个愤怒的小鸟小游戏，单 HTML 文件。
+Create an Angry Birds-style mini game in a single HTML file.
 ```
 
 Expected: marker is injected and `team_route=complex`, because the prompt

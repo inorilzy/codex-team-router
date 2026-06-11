@@ -90,6 +90,8 @@ Router without turning the plugin into a separate runtime.
 - Exercise `sync-agents.mjs --target <temp> --write --json` from the aggregate
   source check so the write path is continuously tested without touching user
   agent directories.
+- Document the JSON report contract in `docs/json-reports.md` so external
+  consumers can rely on `schema_version`, summary fields, and exit behavior.
 
 ## Not adopted yet
 

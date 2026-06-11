@@ -311,7 +311,8 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 - `scripts/route-fixtures.mjs --json`: emits a machine-readable route
   regression report for dashboards or CI adapters.
 
-All machine-readable reports include `schema_version: 1` at the top level.
+All machine-readable reports include `schema_version: 1` at the top level. See
+[docs/json-reports.md](docs/json-reports.md) for the report contract.
 
 The GitHub Actions workflow runs both `check-source.mjs` and
 `check-source.mjs --json` on Ubuntu and Windows, so pull requests can validate

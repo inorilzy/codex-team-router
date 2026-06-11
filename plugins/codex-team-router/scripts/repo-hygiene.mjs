@@ -43,6 +43,8 @@ function checkReadmes() {
   record(hasCjk(chineseReadme), "README.zh-CN.md contains Chinese content");
   record(englishReadme.includes("README.zh-CN.md"), "README.md links the Chinese README");
   record(chineseReadme.includes("README.md"), "README.zh-CN.md links the English README");
+  record(englishReadme.includes("docs/json-reports.md"), "README.md links the JSON report contract");
+  record(chineseReadme.includes("docs/json-reports.md"), "README.zh-CN.md links the JSON report contract");
 }
 
 function checkMarketplace() {
@@ -111,6 +113,16 @@ function checkCiWorkflow() {
   record(workflow.includes("check-source.mjs --json"), "Source Check runs the aggregate JSON report");
 }
 
+function checkDocs() {
+  const jsonReportsPath = join(repoRoot, "docs", "json-reports.md");
+  record(existsSync(jsonReportsPath), "JSON report contract doc exists", "docs/json-reports.md");
+  if (existsSync(jsonReportsPath)) {
+    const content = readText("docs/json-reports.md");
+    record(content.includes("schema_version"), "JSON report contract documents schema_version");
+    record(content.includes("summary.fail_count"), "JSON report contract documents fail_count");
+  }
+}
+
 try {
   if (!jsonMode) {
     console.log("Codex Team Router repo hygiene");
@@ -124,6 +136,7 @@ try {
   checkSkillIdentity();
   checkRuntimeArtifacts();
   checkCiWorkflow();
+  checkDocs();
 
   const failCount = checks.filter((check) => !check.ok).length;
   if (jsonMode) {

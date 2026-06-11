@@ -27,6 +27,7 @@ Every JSON report should include top-level `schema_version: 1`. The aggregate
 `check-source.mjs --json` command validates child report schema versions.
 The source check also verifies that the sync-agents write path creates all
 seven bundled custom-agent templates in a temporary directory.
+The JSON report contract is documented in [json-reports.md](json-reports.md).
 
 `route-fixtures.mjs` should cover simple terminal prompts, casual chat, review
 prompts, standard UI work, `parallel_read`, complex game work, `high_risk`, and

@@ -76,6 +76,13 @@ routing receipt and prevents silent un-routed implementation. For `standard`,
 automatically spawn visible native Codex App subagents when that is the chosen
 execution mode.
 
+For `implement` and `fix` routes, `execution: subagents` means an executor or
+worker subagent owns the primary file edits. Planner, analyst, reviewer, or
+verifier sidecars may help, but they do not satisfy delegated implementation by
+themselves. If the main thread performs the primary edits, use
+`execution: main` in the routing receipt instead of reporting delegated
+subagent execution.
+
 Subagent routing has three gates, in this order:
 
 1. User opt-out gate: if the user explicitly says not to use subagents,
@@ -452,7 +459,9 @@ the proof that the skill was used. `PreToolUse` is warn-only by default for
 emit the receipt and apply the automatic routing gates before direct writes.
 Set `CODEX_TEAM_ROUTER_SUBAGENT_GATE=enforce` only when you intentionally want
 this reminder to use Codex's documented `permissionDecision: "deny"` output for
-direct file writes until a native subagent has started. Set
+direct file writes until the route-required subagent has started. For
+`implement` and `fix` routes, that means an executor or worker, not only a
+planner or reviewer. Set
 `CODEX_TEAM_ROUTER_SUBAGENT_GATE=off` to disable the gate. Set
 `CODEX_TEAM_ROUTER_HOOK_MODE=enforce` only when the project has tested the hook
 behavior and wants risky-command warnings to fail the hook command. The legacy
@@ -474,9 +483,11 @@ Default plugin hook responsibilities:
 - `PreToolUse`: warn once when implementation-like tool use starts after a
   prompt was marked for team routing. For standard/complex/high-risk routed
   prompts, warn by default before direct writes until the receipt/subagent
-  decision is visible. In strict opt-in mode, block direct writes until a
-  subagent has started, so the model cannot silently route to main-thread
-  implementation after writing the receipt.
+  decision is visible. In strict opt-in mode, block direct writes until the
+  route-required subagent has started. For implementation and fix routes,
+  planner/reviewer-only sidecars do not satisfy `execution: subagents`;
+  primary edits require an executor/worker or an explicit `execution: main`
+  fallback.
 - `SubagentStart`: append lifecycle evidence when a child agent starts.
 - `SubagentStop`: mark the matching running agent complete when possible.
 - `Stop`: write `.codex/team-router/completion-gate.json` and warn when

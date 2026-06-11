@@ -117,6 +117,10 @@ function runHook(event, payload) {
   });
 }
 
+function resetHookState() {
+  rmSync(join(hookWorkspaceDir, ".codex", "team-router"), { recursive: true, force: true });
+}
+
 function parseHookStdout(run, label) {
   if (run.status !== 0) {
     record("fail", `${label} exited non-zero`, run.stderr || run.stdout);
@@ -317,6 +321,53 @@ function checkHookSimulation() {
   record(preToolOutput.startsWith("{") ? "pass" : "fail", "PreToolUse emits JSON stdout");
   record(preToolOutput.includes("tool_search") ? "pass" : "warn", "PreToolUse reminder includes tool_search guidance");
   record(preToolOutput.includes("automatic authorization") ? "pass" : "fail", "PreToolUse reminder preserves automatic subagent authorization");
+
+  resetHookState();
+
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "修复这个插件的路由问题。"
+  });
+  runHook("SubagentStart", {
+    hook_event_name: "SubagentStart",
+    subagent_type: "planner",
+    role_id: "planner"
+  });
+
+  const plannerOnlyWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+
+  if (plannerOnlyWriteRun.status !== 0) {
+    record("fail", "Planner-only write gate simulation exited non-zero", plannerOnlyWriteRun.stderr || plannerOnlyWriteRun.stdout);
+    return;
+  }
+
+  const plannerOnlyWriteOutput = plannerOnlyWriteRun.stdout.trim();
+  record(plannerOnlyWriteOutput.startsWith("{") ? "pass" : "fail", "Planner-only implementation write still emits JSON stdout");
+  record(plannerOnlyWriteOutput.includes("executor/worker") ? "pass" : "fail", "Planner-only implementation write still requires executor/worker");
+
+  runHook("SubagentStart", {
+    hook_event_name: "SubagentStart",
+    subagent_type: "worker",
+    role_id: "worker"
+  });
+
+  const workerWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+
+  if (workerWriteRun.status !== 0) {
+    record("fail", "Worker write gate simulation exited non-zero", workerWriteRun.stderr || workerWriteRun.stdout);
+    return;
+  }
+
+  const workerWriteOutput = workerWriteRun.stdout.trim();
+  record(!workerWriteOutput.includes("executor/worker") ? "pass" : "fail", "Executor/worker start satisfies implementation write gate", workerWriteOutput);
 }
 
 function checkRuntimeStatusSummary() {

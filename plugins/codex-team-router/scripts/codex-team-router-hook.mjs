@@ -106,7 +106,7 @@ function deriveNextAction(state) {
     return "Wait for running subagents, then integrate their results in the main thread.";
   }
   if (route === "standard" || route === "complex" || route === "high_risk") {
-    if (!hasSubagentStarted(state)) {
+    if (!hasRequiredSubagentStarted(state)) {
       return "Emit the routing receipt; spawn routed subagents unless the user opted out, confirmation is pending, or native tools are unavailable.";
     }
     if (validationCount === 0) {
@@ -126,7 +126,7 @@ function buildTaskBoard(state) {
   const routeRequired = state.route_required?.required === true;
   const route = routeLevel(state);
   const delegatedRoute = route === "parallel_read" || route === "standard" || route === "complex" || route === "high_risk";
-  const agentsStarted = hasSubagentStarted(state);
+  const agentsStarted = hasRequiredSubagentStarted(state);
   const validationCount = (state.validation_evidence || []).length;
 
   return [
@@ -250,6 +250,30 @@ function isDelegatedRoute(state) {
 
 function hasSubagentStarted(state) {
   return Array.isArray(state.agents) && state.agents.length > 0;
+}
+
+function isImplementationIntent(state) {
+  const intent = state.route_required?.classification?.intent || "";
+  return intent === "implement" || intent === "fix";
+}
+
+function isExecutorLikeAgent(agent) {
+  const fields = [
+    agent.role_id,
+    agent.custom_agent,
+    agent.native_agent_type,
+    agent.agent_type,
+    agent.nickname
+  ].filter(Boolean).join(" ");
+  return /\b(executor|worker)\b/i.test(fields);
+}
+
+function hasExecutorStarted(state) {
+  return Array.isArray(state.agents) && state.agents.some(isExecutorLikeAgent);
+}
+
+function hasRequiredSubagentStarted(state) {
+  return isImplementationIntent(state) ? hasExecutorStarted(state) : hasSubagentStarted(state);
 }
 
 function isSimpleTerminalPrompt(prompt) {
@@ -393,6 +417,7 @@ function userPromptSubmit(payload) {
     "If high-risk confirmation is granted, continue to the native-tool availability check; if confirmation is declined or not granted, emit the fallback receipt and continue with the documented main-thread fallback without spawning.",
     "If `multi_agent_v1` is not visible and the route calls for subagents, use tool discovery first. In Codex App, call `tool_search` with query `multi_agent_v1 spawn_agent native subagent Codex App`, then return to the native-tool availability check instead of falling back immediately.",
     "Treat suggested_execution as the hook's preferred route, not final judgment. Use `execution=subagents` when spawning is appropriate and available; otherwise make the opt-out, waiting-for-confirmation, confirmed-unavailable, or policy-blocked fallback explicit in the routing receipt.",
+    "For `implement` or `fix` routes, `execution=subagents` requires an executor/worker subagent to own primary file edits; planner/reviewer-only sidecars are insufficient. If the main thread performs primary edits, report `execution=main`.",
     "If native subagent tools are unavailable after discovery, say so in the routing receipt and continue with the documented fallback. Treat this hook output as routing context, not as final judgment."
   ].join("\n");
 
@@ -488,7 +513,7 @@ function preToolUse(payload) {
     }
   }
 
-  if (shouldGateSubagent && isWriteTool(tool, command) && !isSubagentSpawnTool(tool, command) && !hasSubagentStarted(state)) {
+  if (shouldGateSubagent && isWriteTool(tool, command) && !isSubagentSpawnTool(tool, command) && !hasRequiredSubagentStarted(state)) {
     const opening = subagentGate === "warn"
       ? "Codex Team Router route reminder for this delegated engineering task."
       : "Codex Team Router strict gate blocked direct file editing for this delegated engineering task.";
@@ -499,6 +524,7 @@ function preToolUse(payload) {
       "Apply the routing gates in order: opt-out, then high-risk confirmation, then native-tool availability.",
       "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
       "Discover `multi_agent_v1` if needed, then return to the availability check and spawn bounded subagents when the route calls for them.",
+      "For implement/fix routes, planner/reviewer-only sidecars are not enough: spawn an executor/worker to own primary file edits, or explicitly fall back to `execution=main` before editing in the main thread.",
       "Continue in the main thread only for opt-out, waiting for high-risk confirmation, confirmed native-tool unavailability after discovery, or policy-blocked spawning.",
       "Set CODEX_TEAM_ROUTER_SUBAGENT_GATE=enforce only when you intentionally want this reminder to deny direct writes; set CODEX_TEAM_ROUTER_SUBAGENT_GATE=off to disable it."
     ].join(" ");
@@ -515,7 +541,7 @@ function preToolUse(payload) {
     return;
   }
 
-  if (routeRequired && !hasSubagentStarted(state) && !state.pre_tool_route_reminder_sent && routeReminderTools.test(tool || command)) {
+  if (routeRequired && !hasRequiredSubagentStarted(state) && !state.pre_tool_route_reminder_sent && routeReminderTools.test(tool || command)) {
     const warning = isDelegatedRoute(state) ? [
       "[Codex Team Router Hook]",
       "CODEX_TEAM_ROUTER_ROUTE_REMINDER",
@@ -525,6 +551,7 @@ function preToolUse(payload) {
       "Apply the routing gates in order: opt-out, then high-risk confirmation, then native-tool availability.",
       "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
       "If `multi_agent_v1` is hidden, call `tool_search` for `multi_agent_v1 spawn_agent native subagent Codex App`, then return to the availability check and spawn a planner/executor/reviewer or the closest available fallback role.",
+      "For implement/fix routes, planner/reviewer-only sidecars do not satisfy `execution=subagents`; primary edits require an executor/worker or an explicit `execution=main` fallback.",
       "If spawning is blocked by opt-out, waiting for confirmation, confirmed tool unavailability after discovery, or active policy, emit the routing receipt and continue with the documented fallback."
     ].join("\n") : [
       "[Codex Team Router Hook]",

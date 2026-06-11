@@ -31,7 +31,9 @@ authorized, hidden native tools are a discovery step, not a reason to set
 `execution=main`. When `tool_search` is visible, run the discovery query before
 finalizing any fallback route. The routing receipt should remain
 `execution: subagents` only when spawning is authorized; otherwise make the
-main-thread fallback or ask-for-delegation step explicit.
+main-thread fallback or ask-for-delegation step explicit. If discovery makes
+`multi_agent_v1.spawn_agent` available, continue with the native-tool
+availability decision instead of treating discovery itself as a fallback.
 
 If `multi_agent_v1.spawn_agent` exists but a preferred role such as `explorer`,
 `planner`, `executor`, or `reviewer` returns "agent type is currently not
@@ -71,9 +73,28 @@ does not by itself grant user authorization to spawn subagents. For `standard`,
 `complex`, and `high_risk` routes, spawn visible native Codex App subagents only
 when the user explicitly asks for subagents, delegation, parallel work, or
 planner/executor/reviewer style orchestration, or when the user explicitly
-selects a plugin prompt that asks for subagents. External `codex exec` workers
-are only a fallback when native subagent tools are unavailable and spawning is
-authorized by the active tool policy.
+selects a plugin prompt that asks for subagents.
+
+Subagent routing has three gates, in this order:
+
+1. User authorization gate: if subagent spawning is not explicitly authorized,
+   emit the routing receipt and continue in the main thread or ask whether to
+   delegate.
+2. Risk confirmation gate: if the next step is destructive, irreversible,
+   data-loss-prone, or broadly permission-changing, pause for user confirmation
+   before spawning or editing. If the user confirms, continue to the native-tool
+   availability gate. If the user declines or confirmation is not granted, emit
+   the fallback receipt and continue with the documented main-thread fallback
+   without spawning.
+3. Native-tool availability gate: if `multi_agent_v1` is hidden, use
+   `tool_search` before falling back, then return to the availability check. If
+   discovery makes `multi_agent_v1.spawn_agent` available, spawn the bounded
+   subagents required by the route. Use `execution=main` only after native
+   subagent tools are confirmed unavailable after discovery or the active tool
+   policy blocks spawning.
+
+External `codex exec` workers are only a fallback when native subagent tools are
+unavailable and spawning is authorized by the active tool policy.
 
 Use the same routing bias OMO uses in its orchestrator prompts: delegate by
 default for non-trivial engineering work, and work in the main thread only when
@@ -338,9 +359,14 @@ subagent wording" as a reason to stay in the main thread for `standard`,
 authorized subagents or make the main-thread fallback or ask-for-delegation step
 explicit. If `multi_agent_v1` is not initially visible and spawning is
 authorized, perform the tool discovery step before finalizing a subagent route;
-do not write `execution=main` just because the namespace is hidden. If native
-subagent tools are unavailable after discovery, state that fallback explicitly
-in the routing receipt and continue in the main thread.
+do not write `execution=main` just because the namespace is hidden. If a
+high-risk confirmation is granted, continue to the native-tool availability
+check; if confirmation is declined or not granted, emit the fallback receipt and
+use the documented main-thread fallback. If `multi_agent_v1` is hidden, run
+`tool_search`, then return to the same availability decision instead of
+treating discovery itself as a fallback. If native subagent tools are unavailable
+after discovery, or the active policy still blocks spawning, state that fallback
+explicitly in the routing receipt and continue in the main thread.
 
 This skill may be combined with domain-specific skills such as frontend,
 documents, GitHub, or spreadsheet skills. Route first, then let the domain skill
@@ -544,19 +570,26 @@ Gate rules:
 5. Decompose `standard`, `complex`, and `high_risk` prompts into role-sized
    work before implementation.
 6. State a short plan before spawning agents.
-7. Spawn only concrete, bounded subagents that materially advance the task and
+7. Apply the subagent execution gates in order:
+   explicit authorization -> high-risk confirmation -> native-tool availability.
+   When high-risk confirmation is granted, continue to the native-tool
+   availability check; when confirmation is declined or not granted, use the
+   documented main-thread fallback. When `multi_agent_v1` is hidden, run
+   `tool_search` and then repeat the native-tool availability decision before
+   falling back.
+8. Spawn only concrete, bounded subagents that materially advance the task and
    are authorized by the user's explicit request or plugin-selected prompt.
-8. For coding workers, assign explicit owned files or directories.
-9. Tell workers they are not alone in the workspace and must not revert unrelated
+9. For coding workers, assign explicit owned files or directories.
+10. Tell workers they are not alone in the workspace and must not revert unrelated
    changes.
-10. Prefer disjoint write scopes for parallel executors.
-11. Keep the main thread responsible for integration, final review, and user
+11. Prefer disjoint write scopes for parallel executors.
+12. Keep the main thread responsible for integration, final review, and user
     communication.
-12. Wait only when the next main-thread step genuinely needs the subagent result.
-13. After every `multi_agent_v1.spawn_agent`, record the role, nickname, agent
+13. Wait only when the next main-thread step genuinely needs the subagent result.
+14. After every `multi_agent_v1.spawn_agent`, record the role, nickname, agent
     id, responsibility, write scope, start time, and status in run state when
     the user wants traceability.
-14. Close agents when they are no longer needed.
+15. Close agents when they are no longer needed.
 
 ## Prompt Templates
 

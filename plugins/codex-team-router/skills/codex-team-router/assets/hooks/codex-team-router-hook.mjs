@@ -388,7 +388,9 @@ function userPromptSubmit(payload) {
     `Hook pre-classification: intent=${classification.intent}; domain=${classification.domain}; authorization=${classification.authorization}; prompt_complexity=${classification.prompt_complexity}; team_route=${classification.team_route}; suggested_execution=${classification.execution}; signals=${classification.signals}.`,
     "For standard, complex, or high_risk engineering prompts, this marker is routing context only. It does not by itself grant user authorization to spawn subagents.",
     "Spawn visible native Codex App subagents only when the user explicitly asks for subagents, delegation, parallel work, planner/executor/reviewer, or explicitly selects a plugin prompt that asks for subagents.",
-    "If subagent spawning is explicitly authorized and `multi_agent_v1` is not visible, use tool discovery first. In Codex App, call `tool_search` with query `multi_agent_v1 spawn_agent native subagent Codex App`; do not claim native subagent tools are unavailable before this discovery attempt.",
+    "Routing gates apply in this order: explicit authorization -> high-risk confirmation -> native-tool availability.",
+    "If high-risk confirmation is granted, continue to the native-tool availability check; if confirmation is declined or not granted, emit the fallback receipt and continue with the documented main-thread fallback without spawning.",
+    "If subagent spawning is explicitly authorized and `multi_agent_v1` is not visible, use tool discovery first. In Codex App, call `tool_search` with query `multi_agent_v1 spawn_agent native subagent Codex App`, then return to the native-tool availability check instead of falling back immediately.",
     "Treat suggested_execution as the hook's preferred route, not final authorization. Use `execution=subagents` only when spawning is authorized and available; otherwise make the main-thread fallback or ask-for-delegation step explicit in the routing receipt.",
     "If native subagent tools are unavailable after discovery, say so in the routing receipt and continue with the documented fallback. Treat this hook output as routing context, not as final judgment."
   ].join("\n");
@@ -493,7 +495,9 @@ function preToolUse(payload) {
       opening,
       "This prompt was routed as standard/complex/high_risk and requires a visible routing receipt before implementation edits.",
       "The hook marker does not override Codex's documented explicit-subagent-authorization rule.",
-      "If the user explicitly asked for subagents/delegation/parallel work, discover `multi_agent_v1` if needed and spawn a bounded subagent. Otherwise continue in the main thread after the routing receipt, or ask the user whether to delegate.",
+      "Apply the routing gates in order: explicit authorization, then high-risk confirmation, then native-tool availability.",
+      "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
+      "If the user explicitly asked for subagents/delegation/parallel work, discover `multi_agent_v1` if needed, return to the availability check, and spawn a bounded subagent. Otherwise continue in the main thread after the routing receipt, or ask the user whether to delegate.",
       "Set CODEX_TEAM_ROUTER_SUBAGENT_GATE=enforce only when you intentionally want this reminder to deny direct writes; set CODEX_TEAM_ROUTER_SUBAGENT_GATE=off to disable it."
     ].join(" ");
     const record = { event, at: now(), tool, command: command || null, message: reason };
@@ -516,8 +520,10 @@ function preToolUse(payload) {
       "This prompt was pre-classified as standard/complex/high_risk engineering work.",
       "Do not route to main-thread implementation merely because `multi_agent_v1` is not currently visible.",
       "The hook marker is not a substitute for explicit user authorization to spawn subagents.",
-      "If the user explicitly asked for subagents/delegation/parallel work and `multi_agent_v1` is hidden, call `tool_search` for `multi_agent_v1 spawn_agent native subagent Codex App`, then spawn a planner/executor/reviewer or the closest available fallback role.",
-      "If spawning is not explicitly authorized, emit the routing receipt and continue in the main thread or ask the user whether to delegate."
+      "Apply the routing gates in order: explicit authorization, then high-risk confirmation, then native-tool availability.",
+      "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
+      "If the user explicitly asked for subagents/delegation/parallel work and `multi_agent_v1` is hidden, call `tool_search` for `multi_agent_v1 spawn_agent native subagent Codex App`, then return to the availability check and spawn a planner/executor/reviewer or the closest available fallback role.",
+      "If spawning is not explicitly authorized, blocked by confirmation, unavailable after discovery, or blocked by active policy, emit the routing receipt and continue in the main thread or ask the user whether to delegate."
     ].join("\n") : [
       "[Codex Team Router Hook]",
       "CODEX_TEAM_ROUTER_ROUTE_REMINDER",

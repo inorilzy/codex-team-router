@@ -33,6 +33,10 @@ const jsonChecks = [
   {
     name: "source-only doctor JSON report",
     args: [join(scriptDir, "doctor.mjs"), "--source-only", "--json"]
+  },
+  {
+    name: "sync agents JSON report",
+    args: [join(scriptDir, "sync-agents.mjs"), "--json"]
   }
 ];
 
@@ -97,7 +101,7 @@ function runJsonCheck(check) {
 
   const failCount = report?.summary?.fail_count;
   const warnCount = report?.summary?.warn_count || 0;
-  const itemCount = report?.summary?.check_count || report?.summary?.fixture_count;
+  const itemCount = report?.summary?.check_count || report?.summary?.fixture_count || report?.summary?.template_count;
   if (failCount !== 0) {
     console.error(result.stdout);
     console.error(`\nFAIL ${check.name}: report contains ${failCount} failure(s)`);

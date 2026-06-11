@@ -296,6 +296,8 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
   templates into project-local `.codex/agents`, global `~/.codex/agents`, or a
   custom target directory. It copies missing files by default and overwrites
   only with `--force --write`.
+- `scripts/sync-agents.mjs --json`: emits a machine-readable dry-run or write
+  report for agent template sync plans.
 - `scripts/doctor.mjs --source-only`: checks source-tree structure, hook
   simulation, runtime status summary, and bundled custom-agent templates without
   requiring a local Codex install.

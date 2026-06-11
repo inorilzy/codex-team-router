@@ -250,6 +250,7 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 - `scripts/route-fixtures.mjs`：在临时 workspace 中运行 hook 分类 fixtures，检查 marker 注入、route 分类、`status.json`、`task_board` 和 `next_action`。
 - `scripts/smoke-install.mjs`：创建临时 `CODEX_HOME`，添加本地 repo marketplace，安装 `codex-team-router@codex-team-router`，并检查 Codex 是否显示 installed 和 enabled。
 - `scripts/sync-agents.mjs`：预览或安装 bundled custom-agent 模板到项目 `.codex/agents`、全局 `~/.codex/agents` 或自定义目录。默认只复制缺失文件；只有显式使用 `--force --write` 才覆盖不同文件。
+- `scripts/sync-agents.mjs --json`：输出机器可读 agent 模板同步计划或写入报告。
 - `scripts/doctor.mjs --source-only`：只检查源码树结构、hook 模拟、runtime status summary 和 bundled custom-agent 模板，不需要本地 Codex 安装。
 - `scripts/doctor.mjs`：检查插件结构、hook 模拟、模型 catalog fallback、runtime status summary、安装状态、hook trust，以及 bundled/global custom-agent 是否漂移。
 - `scripts/repo-hygiene.mjs --json` 和 `scripts/doctor.mjs --json`：输出机器可读健康报告，可供 CI、外部 orchestrator 或本地 dashboard 解析。

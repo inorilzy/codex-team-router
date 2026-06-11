@@ -85,6 +85,8 @@ Router without turning the plugin into a separate runtime.
   the same machine-readable status pattern used by CLI orchestrators.
 - Version machine-readable report schemas with top-level `schema_version: 1`
   and have the aggregate source check reject child reports without it.
+- Add a machine-readable `sync-agents.mjs --json` dry-run report so custom-agent
+  template sync plans can be inspected by CI or external dashboards.
 
 ## Not adopted yet
 

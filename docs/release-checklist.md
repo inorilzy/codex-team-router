@@ -20,6 +20,7 @@ The command runs:
 - `scripts/route-fixtures.mjs --json`
 - `scripts/repo-hygiene.mjs --json`
 - `scripts/doctor.mjs --source-only --json`
+- `scripts/sync-agents.mjs --json`
 
 Every JSON report should include top-level `schema_version: 1`. The aggregate
 `check-source.mjs --json` command validates child report schema versions.

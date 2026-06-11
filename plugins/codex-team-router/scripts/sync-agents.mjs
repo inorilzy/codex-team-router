@@ -12,7 +12,7 @@ const codexHome = process.env.CODEX_HOME || join(homedir(), ".codex");
 
 function usage() {
   console.log(`Usage:
-  node scripts/sync-agents.mjs [--project <dir> | --global | --target <dir>] [--write] [--force] [--role <name> ...]
+  node scripts/sync-agents.mjs [--project <dir> | --global | --target <dir>] [--write] [--force] [--role <name> ...] [--json]
 
 Defaults:
   --project .      Target <project>/.codex/agents
@@ -24,6 +24,7 @@ Examples:
   node scripts/sync-agents.mjs --global --write
   node scripts/sync-agents.mjs --target C:\\tmp\\agents --write --force
   node scripts/sync-agents.mjs --role planner --role reviewer --write
+  node scripts/sync-agents.mjs --json
 `);
 }
 
@@ -34,7 +35,8 @@ function parseArgs(argv) {
     global: false,
     write: false,
     force: false,
-    roles: []
+    roles: [],
+    json: false
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -52,6 +54,8 @@ function parseArgs(argv) {
       options.write = true;
     } else if (arg === "--force") {
       options.force = true;
+    } else if (arg === "--json") {
+      options.json = true;
     } else if (arg === "--role") {
       options.roles.push(argv[++index]);
     } else {
@@ -64,6 +68,30 @@ function parseArgs(argv) {
   }
 
   return options;
+}
+
+function printJsonReport(options, destinationDir, plan, error = null) {
+  const writes = plan.filter((item) => item.action === "copy" || item.action === "overwrite");
+  const skippedDifferent = plan.filter((item) => item.action === "skip-different");
+  const report = {
+    tool: "sync-agents",
+    schema_version: 1,
+    mode: options.write ? "write" : "dry-run",
+    target: destinationDir,
+    summary: {
+      fail_count: error ? 1 : 0,
+      write_candidate_count: writes.length,
+      skipped_different_count: skippedDifferent.length,
+      template_count: plan.length
+    },
+    plan
+  };
+
+  if (error) {
+    report.error = error.message;
+  }
+
+  console.log(JSON.stringify(report, null, 2));
 }
 
 function sha256(path) {
@@ -117,6 +145,17 @@ function main() {
   const writes = plan.filter((item) => item.action === "copy" || item.action === "overwrite");
   const skippedDifferent = plan.filter((item) => item.action === "skip-different");
 
+  if (options.json) {
+    if (options.write && writes.length > 0) {
+      mkdirSync(destinationDir, { recursive: true });
+      for (const item of writes) {
+        copyFileSync(item.source, item.destination);
+      }
+    }
+    printJsonReport(options, destinationDir, plan);
+    return;
+  }
+
   console.log(`Codex Team Router agent template sync`);
   console.log(`Mode: ${options.write ? "write" : "dry-run"}`);
   console.log(`Target: ${destinationDir}`);
@@ -142,11 +181,27 @@ function main() {
   if (skippedDifferent.length > 0 && !options.force) {
     console.log("Different existing files were skipped. Re-run with --force --write only if you intentionally want to overwrite them.");
   }
+
 }
 
 try {
   main();
 } catch (error) {
-  console.error(`FAIL ${error.message}`);
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify({
+      tool: "sync-agents",
+      schema_version: 1,
+      summary: {
+        fail_count: 1,
+        write_candidate_count: 0,
+        skipped_different_count: 0,
+        template_count: 0
+      },
+      plan: [],
+      error: error.message
+    }, null, 2));
+  } else {
+    console.error(`FAIL ${error.message}`);
+  }
   process.exit(1);
 }

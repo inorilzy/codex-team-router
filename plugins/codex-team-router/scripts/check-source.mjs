@@ -89,6 +89,12 @@ function runJsonCheck(check) {
     process.exit(1);
   }
 
+  if (report?.schema_version !== 1) {
+    console.error(result.stdout);
+    console.error(`\nFAIL ${check.name}: expected schema_version=1`);
+    process.exit(1);
+  }
+
   const failCount = report?.summary?.fail_count;
   const warnCount = report?.summary?.warn_count || 0;
   const itemCount = report?.summary?.check_count || report?.summary?.fixture_count;
@@ -124,6 +130,10 @@ function collectJsonCheck(check) {
 
   try {
     const report = JSON.parse(result.stdout);
+    if (report?.schema_version !== 1) {
+      collected.output_tail = `Expected schema_version=1\n${result.stdout}`.slice(-4000);
+      return collected;
+    }
     collected.report_summary = report?.summary || null;
     collected.ok = report?.summary?.fail_count === 0;
     if (!collected.ok) {
@@ -141,6 +151,7 @@ function printJsonReport(checks) {
   const warnCount = checks.reduce((count, check) => count + (check.report_summary?.warn_count || 0), 0);
   console.log(JSON.stringify({
     tool: "check-source",
+    schema_version: 1,
     summary: {
       fail_count: failCount,
       warn_count: warnCount,

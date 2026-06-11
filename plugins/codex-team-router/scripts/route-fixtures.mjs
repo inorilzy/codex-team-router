@@ -171,6 +171,7 @@ try {
   if (jsonMode) {
     console.log(JSON.stringify({
       tool: "route-fixtures",
+      schema_version: 1,
       summary: {
         fail_count: 0,
         fixture_count: fixtures.length
@@ -185,6 +186,7 @@ try {
   if (jsonMode) {
     console.log(JSON.stringify({
       tool: "route-fixtures",
+      schema_version: 1,
       summary: {
         fail_count: 1,
         fixture_count: fixtures.length,

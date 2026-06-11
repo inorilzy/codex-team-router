@@ -55,6 +55,7 @@ function printJsonReport(error = null) {
   const warnCount = results.filter((item) => item.level === "warn").length;
   const report = {
     tool: "doctor",
+    schema_version: 1,
     plugin_root: pluginRoot,
     codex_home: codexHome,
     mode: sourceOnly ? "source-only" : "full",

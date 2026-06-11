@@ -255,6 +255,8 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 - `scripts/repo-hygiene.mjs --json` 和 `scripts/doctor.mjs --json`：输出机器可读健康报告，可供 CI、外部 orchestrator 或本地 dashboard 解析。
 - `scripts/route-fixtures.mjs --json`：输出机器可读路由回归报告，可供 dashboard 或 CI adapter 解析。
 
+所有机器可读报告都会在顶层包含 `schema_version: 1`。
+
 GitHub Actions workflow 会在 Ubuntu 和 Windows 上同时运行 `check-source.mjs` 和 `check-source.mjs --json`，所以 pull request 可以在没有 Codex App profile 或本地模型 catalog 的环境里验证源码树。
 
 完整发布前检查见 [docs/release-checklist.md](docs/release-checklist.md)。

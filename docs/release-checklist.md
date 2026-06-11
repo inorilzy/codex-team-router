@@ -21,6 +21,9 @@ The command runs:
 - `scripts/repo-hygiene.mjs --json`
 - `scripts/doctor.mjs --source-only --json`
 
+Every JSON report should include top-level `schema_version: 1`. The aggregate
+`check-source.mjs --json` command validates child report schema versions.
+
 `route-fixtures.mjs` should cover simple terminal prompts, casual chat, review
 prompts, standard UI work, `parallel_read`, complex game work, `high_risk`, and
 explicit subagent authorization.

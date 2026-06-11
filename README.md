@@ -308,6 +308,8 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 - `scripts/route-fixtures.mjs --json`: emits a machine-readable route
   regression report for dashboards or CI adapters.
 
+All machine-readable reports include `schema_version: 1` at the top level.
+
 The GitHub Actions workflow runs both `check-source.mjs` and
 `check-source.mjs --json` on Ubuntu and Windows, so pull requests can validate
 the source tree without needing a Codex App profile or local model catalog.

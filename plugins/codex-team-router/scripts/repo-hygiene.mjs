@@ -129,6 +129,7 @@ try {
   if (jsonMode) {
     console.log(JSON.stringify({
       tool: "repo-hygiene",
+      schema_version: 1,
       repo_root: repoRoot,
       summary: {
         fail_count: failCount,
@@ -148,6 +149,7 @@ try {
   if (jsonMode) {
     console.log(JSON.stringify({
       tool: "repo-hygiene",
+      schema_version: 1,
       repo_root: repoRoot,
       summary: {
         fail_count: 1,

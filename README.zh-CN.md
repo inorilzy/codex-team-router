@@ -4,6 +4,8 @@
 
 英文版：[README.md](README.md)。
 
+发布记录：[CHANGELOG.md](CHANGELOG.md)。
+
 Codex Team Router 是一个 Codex 插件，用来在工程任务开始前先做路由判断。它会帮助 Codex 判断当前请求应该留在主线程完成，还是应该使用有边界的 executor，或者使用 Codex App 里可见的原生 subagent，例如 planner、executor、reviewer、explorer 和 verifier。
 
 公开插件 id 和 skill id 都是：

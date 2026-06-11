@@ -45,6 +45,8 @@ function checkReadmes() {
   record(chineseReadme.includes("README.md"), "README.zh-CN.md links the English README");
   record(englishReadme.includes("docs/json-reports.md"), "README.md links the JSON report contract");
   record(chineseReadme.includes("docs/json-reports.md"), "README.zh-CN.md links the JSON report contract");
+  record(englishReadme.includes("CHANGELOG.md"), "README.md links the changelog");
+  record(chineseReadme.includes("CHANGELOG.md"), "README.zh-CN.md links the changelog");
 }
 
 function checkMarketplace() {
@@ -115,11 +117,18 @@ function checkCiWorkflow() {
 
 function checkDocs() {
   const jsonReportsPath = join(repoRoot, "docs", "json-reports.md");
+  const changelogPath = join(repoRoot, "CHANGELOG.md");
   record(existsSync(jsonReportsPath), "JSON report contract doc exists", "docs/json-reports.md");
   if (existsSync(jsonReportsPath)) {
     const content = readText("docs/json-reports.md");
     record(content.includes("schema_version"), "JSON report contract documents schema_version");
     record(content.includes("summary.fail_count"), "JSON report contract documents fail_count");
+  }
+  record(existsSync(changelogPath), "Changelog exists", "CHANGELOG.md");
+  if (existsSync(changelogPath)) {
+    const content = readText("CHANGELOG.md");
+    record(content.includes("## Unreleased"), "Changelog has an Unreleased section");
+    record(content.includes("Keep a Changelog"), "Changelog explains its format");
   }
 }
 

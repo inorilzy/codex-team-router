@@ -80,6 +80,8 @@ profile, but they are not source-tree failures.
 
 ## Publish
 
+Update [../CHANGELOG.md](../CHANGELOG.md) before cutting a tagged release.
+
 Commit the changes, then push:
 
 ```powershell

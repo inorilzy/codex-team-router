@@ -4,6 +4,8 @@
 
 Chinese version: [README.zh-CN.md](README.zh-CN.md).
 
+Release notes: [CHANGELOG.md](CHANGELOG.md).
+
 Codex Team Router is a Codex plugin for routing engineering tasks before work
 starts. It helps Codex decide whether a coding request should stay in the main
 thread, use a bounded executor, or use visible Codex App native subagents such

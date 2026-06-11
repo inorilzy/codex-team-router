@@ -92,6 +92,8 @@ Router without turning the plugin into a separate runtime.
   agent directories.
 - Document the JSON report contract in `docs/json-reports.md` so external
   consumers can rely on `schema_version`, summary fields, and exit behavior.
+- Add a human-readable `CHANGELOG.md` so release notes are not reconstructed
+  from commit history alone.
 
 ## Not adopted yet
 

@@ -231,9 +231,9 @@ function checkHookSimulation() {
   record(context.includes(routeMarker) ? "pass" : "fail", "UserPromptSubmit injects route-required marker");
   record(context.includes("tool_search") ? "pass" : "fail", "UserPromptSubmit tells the model to discover multi_agent_v1 with tool_search");
   record(context.includes("suggested_execution=subagents") ? "pass" : "fail", "Complex prompt suggests subagents");
-  record(context.includes("authorization=none") ? "pass" : "fail", "Complex prompt records no explicit subagent authorization");
-  record(!context.includes("implicit authorization") ? "pass" : "fail", "UserPromptSubmit does not claim hook marker authorizes spawning");
-  record(context.includes("explicitly asks for subagents") ? "pass" : "fail", "UserPromptSubmit states explicit subagent authorization boundary");
+  record(context.includes("authorization=auto") ? "pass" : "fail", "Complex prompt records automatic subagent authorization");
+  record(context.includes("automatic authorization") ? "pass" : "fail", "UserPromptSubmit states hook marker can authorize spawning");
+  record(context.includes("user opt-out -> high-risk confirmation -> native-tool availability") ? "pass" : "fail", "UserPromptSubmit states automatic routing gates");
 
   const reviewZhRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
@@ -262,7 +262,7 @@ function checkHookSimulation() {
   if (!parallelReadOutput) return;
   const parallelReadContext = hookContextText(parallelReadOutput);
   record(parallelReadContext.includes("team_route=parallel_read") ? "pass" : "fail", "Read-heavy scan routes to parallel_read");
-  record(parallelReadContext.includes("authorization=none") ? "pass" : "fail", "Read-heavy scan does not imply subagent authorization");
+  record(parallelReadContext.includes("authorization=auto") ? "pass" : "fail", "Read-heavy scan uses automatic subagent authorization");
 
   const highRiskRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
@@ -316,7 +316,7 @@ function checkHookSimulation() {
   const preToolOutput = preToolRun.stdout.trim();
   record(preToolOutput.startsWith("{") ? "pass" : "fail", "PreToolUse emits JSON stdout");
   record(preToolOutput.includes("tool_search") ? "pass" : "warn", "PreToolUse reminder includes tool_search guidance");
-  record(preToolOutput.includes("explicit user authorization") ? "pass" : "fail", "PreToolUse reminder preserves explicit subagent authorization boundary");
+  record(preToolOutput.includes("automatic authorization") ? "pass" : "fail", "PreToolUse reminder preserves automatic subagent authorization");
 }
 
 function checkRuntimeStatusSummary() {

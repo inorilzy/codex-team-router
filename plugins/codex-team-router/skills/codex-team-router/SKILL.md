@@ -31,7 +31,7 @@ authorized, hidden native tools are a discovery step, not a reason to set
 `execution=main`. When `tool_search` is visible, run the discovery query before
 finalizing any fallback route. The routing receipt should remain
 `execution: subagents` only when spawning is authorized; otherwise make the
-main-thread fallback or ask-for-delegation step explicit. If discovery makes
+main-thread fallback explicit. If discovery makes
 `multi_agent_v1.spawn_agent` available, continue with the native-tool
 availability decision instead of treating discovery itself as a fallback.
 
@@ -49,7 +49,7 @@ At the start of each use, make a routing decision before doing implementation
 work:
 
 ```text
-intent: <answer|investigate|implement|fix|review|plan|terminal>; domain: <general|visual|game|logic|writing|git|data|infra>; authorization: <explicit|implicit|none>
+intent: <answer|investigate|implement|fix|review|plan|terminal>; domain: <general|visual|game|logic|writing|git|data|infra>; authorization: <auto|explicit|opt_out|blocked>
 prompt_complexity: <low|medium|high|very_high>; signals: <short signals>
 team_route: <trivial|small|standard|parallel_read|complex|high_risk>; execution: <main|executor|subagents>; reason: <short reason>
 ```
@@ -62,24 +62,25 @@ final status instead of interrupting the requested artifact.
 
 Native subagents are preferred when prompt complexity shows that delegation
 materially improves planning, implementation, review, validation, or visible
-coordination in the Codex App subagent panel. An explicit request to use
-`Codex Team Router` for a coding task authorizes this skill's
-complexity-based delegation policy; explicit wording such as subagents,
-delegation, parallel work, or planner/executor/reviewer also authorizes
-spawning. A `UserPromptSubmit` hook injection containing
-`CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is routing context only: it requires the
-visible routing receipt and prevents silent un-routed implementation, but it
-does not by itself grant user authorization to spawn subagents. For `standard`,
-`complex`, and `high_risk` routes, spawn visible native Codex App subagents only
-when the user explicitly asks for subagents, delegation, parallel work, or
-planner/executor/reviewer style orchestration, or when the user explicitly
-selects a plugin prompt that asks for subagents.
+coordination in the Codex App subagent panel. When this skill is selected,
+explicitly invoked, or injected by its routing hook for an engineering task, it
+authorizes its own complexity-based delegation policy by default. The user does
+not need to repeat "use subagents" for every task. Explicit wording such as
+subagents, delegation, parallel work, or planner/executor/reviewer still counts
+as `authorization: explicit`; otherwise use `authorization: auto`.
+
+A `UserPromptSubmit` hook injection containing
+`CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is routing context that requires the visible
+routing receipt and prevents silent un-routed implementation. For `standard`,
+`complex`, `high_risk`, or `parallel_read` routes, it also means the skill may
+automatically spawn visible native Codex App subagents when that is the chosen
+execution mode.
 
 Subagent routing has three gates, in this order:
 
-1. User authorization gate: if subagent spawning is not explicitly authorized,
-   emit the routing receipt and continue in the main thread or ask whether to
-   delegate.
+1. User opt-out gate: if the user explicitly says not to use subagents,
+   delegation, parallel work, or planner/executor/reviewer orchestration, set
+   `authorization: opt_out` and use the main-thread fallback.
 2. Risk confirmation gate: if the next step is destructive, irreversible,
    data-loss-prone, or broadly permission-changing, pause for user confirmation
    before spawning or editing. If the user confirms, continue to the native-tool
@@ -326,47 +327,44 @@ default route table:
   Main thread may plan and implement directly for tiny local work.
 - `standard`: use when prompt complexity is `medium`: bounded single features,
   straightforward single-file UI, simple arcade mechanics, or small CRUD flows.
-  When authorized, spawn `planner`, `executor`, and `reviewer` in canonical
-  order. Treat `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as routing context that
-  requires a visible receipt, not as authorization to spawn.
-- `parallel_read`: when authorized, spawn one or more `explorer` agents or use
-  CSV fan-out for read-heavy scans.
+  When the skill chooses subagent execution, spawn `planner`, `executor`, and
+  `reviewer` in canonical order. Treat `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as
+  automatic routing authorization. Apply the subagent execution gates before
+  spawning.
+- `parallel_read`: when the skill chooses subagent execution, spawn one or more
+  `explorer` agents or use CSV fan-out for read-heavy scans.
 - `complex`: use when prompt complexity is `high`, even if output is a single
   file, or when an implementation prompt has two or more meaningful subtasks,
   product/design judgment, game mechanics, nontrivial validation, or likely
-  >50 lines of coherent new work. When authorized, spawn `analyst`, `planner`,
-  `plan-reviewer`, `executor`, and `reviewer` in canonical order. Treat
-  `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as routing context that requires a
-  visible receipt, not as authorization to spawn.
-  Without any delegation authorization, route the task and ask whether to
-  delegate before implementation.
-- `high_risk`: when authorized, spawn `analyst`, `planner`, `plan-reviewer`,
-  one or more `executor` agents, `reviewer`, and `verifier`. Use plan/review
-  gates and require validation evidence before completion. Treat
-  `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as routing context that requires a
-  visible receipt, not as authorization to spawn.
-  Without any delegation authorization, route first and ask before spawning.
+  >50 lines of coherent new work. When the skill chooses subagent execution,
+  spawn `analyst`, `planner`, `plan-reviewer`, `executor`, and `reviewer` in
+  canonical order. Treat `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as automatic routing
+  authorization. Apply the subagent execution gates before spawning.
+- `high_risk`: spawn `analyst`, `planner`, `plan-reviewer`, one or more
+  `executor` agents, `reviewer`, and `verifier` when subagent tools are
+  available, but pause for user confirmation before destructive operations,
+  irreversible migrations, broad permission changes, or data-loss risks. Use
+  plan/review gates and require validation evidence before completion.
 
 Route conservatively for casual or tiny tasks, but do not let "single file" hide
-real prompt complexity. If the user explicitly invokes `Codex Team Router`
-or selects the plugin for a coding task, always emit the routing receipt and
-apply the complexity-based delegation policy. Wording such as "use subagents",
-"spawn agents", "delegate", "parallel", "planner/executor/reviewer", "用
-subagent", "委派", or "并行" also authorizes native agent spawning. If
-`CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is present, do not use "no explicit
-subagent wording" as a reason to stay in the main thread for `standard`,
-`complex`, or `high_risk` prompts; instead, emit the receipt and either use
-authorized subagents or make the main-thread fallback or ask-for-delegation step
-explicit. If `multi_agent_v1` is not initially visible and spawning is
-authorized, perform the tool discovery step before finalizing a subagent route;
-do not write `execution=main` just because the namespace is hidden. If a
-high-risk confirmation is granted, continue to the native-tool availability
-check; if confirmation is declined or not granted, emit the fallback receipt and
-use the documented main-thread fallback. If `multi_agent_v1` is hidden, run
-`tool_search`, then return to the same availability decision instead of
-treating discovery itself as a fallback. If native subagent tools are unavailable
-after discovery, or the active policy still blocks spawning, state that fallback
-explicitly in the routing receipt and continue in the main thread.
+real prompt complexity. If the user explicitly invokes `Codex Team Router`,
+selects the plugin for a coding task, or the hook injects
+`CODEX_TEAM_ROUTER_ROUTE_REQUIRED`, always emit the routing receipt and apply
+the complexity-based delegation policy. Wording such as "use subagents", "spawn
+agents", "delegate", "parallel", "planner/executor/reviewer", "用 subagent",
+"委派", or "并行" marks the receipt as `authorization: explicit`; otherwise use
+`authorization: auto`. Do not use "no explicit subagent wording" as a reason to
+stay in the main thread for `standard`, `complex`, `high_risk`, or
+`parallel_read` prompts. Instead, apply the three subagent execution gates:
+respect user opt-out, pause for high-risk confirmation, then discover/check
+`multi_agent_v1`. If a high-risk confirmation is granted, continue to the
+native-tool availability check; if confirmation is declined or not granted,
+emit the fallback receipt and use the documented main-thread fallback. If
+`multi_agent_v1` is hidden, run `tool_search`, then return to the same
+availability decision instead of treating discovery itself as a fallback. If
+native subagent tools are unavailable after discovery, or the active policy
+still blocks spawning, state that fallback explicitly in the routing receipt and
+continue in the main thread.
 
 This skill may be combined with domain-specific skills such as frontend,
 documents, GitHub, or spreadsheet skills. Route first, then let the domain skill
@@ -571,7 +569,7 @@ Gate rules:
    work before implementation.
 6. State a short plan before spawning agents.
 7. Apply the subagent execution gates in order:
-   explicit authorization -> high-risk confirmation -> native-tool availability.
+   user opt-out -> high-risk confirmation -> native-tool availability.
    When high-risk confirmation is granted, continue to the native-tool
    availability check; when confirmation is declined or not granted, use the
    documented main-thread fallback. When `multi_agent_v1` is hidden, run

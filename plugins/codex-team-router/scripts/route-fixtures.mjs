@@ -52,8 +52,8 @@ const fixtures = [
     prompt: "查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。",
     marker: true,
     routeRequired: true,
-    includes: ["intent=investigate", "domain=infra", "authorization=none", "team_route=parallel_read"],
-    status: { route: "parallel_read", intent: "investigate", domain: "infra", authorization: "none", execution: "subagents" }
+    includes: ["intent=investigate", "domain=infra", "authorization=auto", "team_route=parallel_read"],
+    status: { route: "parallel_read", intent: "investigate", domain: "infra", authorization: "auto", execution: "subagents" }
   },
   {
     name: "single-file physics game",

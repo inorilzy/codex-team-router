@@ -19,8 +19,8 @@ The format follows the human-readable changelog style described by
 - Custom-agent templates for analyst, planner, plan-reviewer, executor,
   reviewer, explorer, and verifier roles.
 - Route fixtures for terminal-only prompts, casual chat, plugin review,
-  standard UI work, `parallel_read`, complex games, `high_risk`, and explicit
-  subagent authorization.
+  standard UI work, `parallel_read`, complex games, `high_risk`, automatic
+  routing, and explicit subagent wording.
 - `doctor.mjs`, `repo-hygiene.mjs`, `route-fixtures.mjs`, `sync-agents.mjs`,
   and `check-source.mjs` health and release validation helpers.
 - Machine-readable JSON reports with top-level `schema_version: 1`.
@@ -30,8 +30,8 @@ The format follows the human-readable changelog style described by
 
 ### Changed
 
-- Aligned hook and skill language with Codex's explicit subagent authorization
-  boundary.
+- Aligned hook and skill language around automatic subagent routing gates:
+  opt-out, high-risk confirmation, and native-tool availability.
 - Added model catalog fallback from `cc-switch-model-catalog.json` to
   `models_cache.json`.
 - Kept verifier custom-agent templates explicitly read-only.

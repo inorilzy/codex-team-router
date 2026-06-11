@@ -46,11 +46,11 @@ flowchart TD
   J -- "standard" --> L["Plan, execute, review"]
   J -- "complex" --> M["Analyze, plan, review plan, execute, review"]
   J -- "high_risk" --> N["Analyze, gated plan, scoped executors, review, verify"]
-  L --> O{"Explicit subagent authorization?"}
+  L --> O{"Automatic routing gates pass?"}
   M --> O
   N --> O
   O -- "Yes" --> P["Spawn visible Codex App subagents when tools are available"]
-  O -- "No" --> Q["Stay in the main thread or ask before delegation"]
+  O -- "No" --> Q["Use the documented main-thread fallback"]
   P --> R["Main thread integrates, verifies, and reports"]
   Q --> R
 ```
@@ -78,9 +78,10 @@ flowchart TD
 
 ## What it does not do
 
-- It does not bypass Codex's subagent authorization boundary. The hook marker
-  `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` only means "route this request and emit a
-  receipt." It does not by itself authorize spawning subagents.
+- It does not bypass opt-out, high-risk confirmation, or tool-availability
+  gates. The hook marker `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is automatic routing
+  authorization for this plugin, but spawning still falls back to the main
+  thread when a gate blocks it.
 - It is not a full oh-my-codex, OMO, or external multi-agent runtime. There is
   no mailbox system, detached worktree pool, or external task runner.
 - It does not force every request into subagents. Simple terminal-only requests
@@ -155,9 +156,9 @@ node plugins\codex-team-router\scripts\smoke-install.mjs
 The router classifies the current prompt by intent, domain, and complexity:
 
 ```text
-intent: implement; domain: visual; authorization: implicit
+intent: implement; domain: visual; authorization: auto
 prompt_complexity: medium; signals: frontend/ui, complete artifact
-team_route: standard; execution: main; reason: no explicit subagent authorization
+team_route: standard; execution: subagents; reason: automatic routing gates passed
 ```
 
 Typical routes:
@@ -171,11 +172,10 @@ Typical routes:
 - `high_risk`: security-sensitive, destructive, migration, architecture, or
   high-blast-radius work.
 
-For `standard`, `complex`, or `high_risk` routes, Codex should decompose the
-task before implementation. It should spawn visible native subagents only when
-the user explicitly asks for subagents, delegation, parallel work, or a
-planner/executor/reviewer workflow, or when a selected plugin prompt explicitly
-asks for subagents.
+For `standard`, `complex`, `parallel_read`, or `high_risk` routes, Codex should
+decompose the task before implementation. In automatic mode, the router marker
+authorizes the skill to choose visible native subagents when the opt-out,
+high-risk confirmation, and native-tool availability gates allow it.
 
 ## Test prompts
 
@@ -221,11 +221,19 @@ Plan a database permission migration with security, rollback, and release valida
 Expected: marker is injected and `team_route=high_risk`.
 
 ```text
+Review this repository for hook and doctor issues.
+```
+
+Expected: marker is injected and `authorization=auto`. Codex may use visible
+native subagents when the routing gates pass and the tools are available.
+
+```text
 Use planner/executor/reviewer subagents to create a small HTML app.
 ```
 
-Expected: marker is injected and `authorization=explicit`. Codex may use
-visible native subagents when the tools are available.
+Expected: marker is injected and `authorization=explicit`. Explicit subagent
+wording is still recorded, but automatic mode does not require repeating that
+wording for every routed engineering prompt.
 
 ## Hooks and environment variables
 

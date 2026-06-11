@@ -30,8 +30,8 @@ seven bundled custom-agent templates in a temporary directory.
 The JSON report contract is documented in [json-reports.md](json-reports.md).
 
 `route-fixtures.mjs` should cover simple terminal prompts, casual chat, review
-prompts, standard UI work, `parallel_read`, complex game work, `high_risk`, and
-explicit subagent authorization.
+prompts, standard UI work, `parallel_read`, complex game work, `high_risk`,
+automatic routing, opt-out, and explicit subagent wording.
 
 ## Plugin validation
 

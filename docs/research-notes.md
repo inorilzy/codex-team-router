@@ -6,8 +6,10 @@ Router without turning the plugin into a separate runtime.
 ## Sources reviewed
 
 - [Codex subagents](https://developers.openai.com/codex/subagents): Codex can
-  spawn specialized agents in parallel for complex work, but only when the user
-  explicitly asks for subagents.
+  spawn specialized agents in parallel for complex work. This plugin intentionally
+  experiments with an automatic routing layer that treats its hook marker as
+  authorization for the skill's own subagent policy, while still respecting
+  opt-out, high-risk confirmation, and native-tool availability gates.
 - [Codex hooks](https://developers.openai.com/codex/hooks): hooks can add
   model-visible context and can deny supported tool calls, but `PreToolUse`
   remains a guardrail rather than a complete enforcement boundary.
@@ -76,9 +78,9 @@ Router without turning the plugin into a separate runtime.
   plugin identity, skill identity, and runtime artifact boundaries under CI.
 - Add machine-readable JSON health reports for repo hygiene and doctor checks,
   then exercise those report modes from the single source-check command.
-- Expand route fixtures to cover read-heavy `parallel_read`, `high_risk`, and
-  explicit subagent authorization paths, not only common standard/complex
-  prompts.
+- Expand route fixtures to cover read-heavy `parallel_read`, `high_risk`,
+  automatic routing, opt-out, and explicit subagent wording paths, not only
+  common standard/complex prompts.
 - Add machine-readable JSON output for route fixtures so routing regressions can
   be consumed by CI, dashboards, or external orchestrator adapters.
 - Add an aggregate `check-source.mjs --json` report and run it in CI, following

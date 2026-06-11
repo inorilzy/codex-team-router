@@ -449,7 +449,7 @@ The hooks are mostly warn-only by default, with one deliberate gate:
 task, but it cannot directly invoke a skill. The visible routing receipt remains
 the proof that the skill was used. `PreToolUse` is warn-only by default for
 `standard`, `complex`, and `high_risk` routed prompts: it reminds the model to
-emit the receipt and respect Codex's explicit subagent authorization boundary.
+emit the receipt and apply the automatic routing gates before direct writes.
 Set `CODEX_TEAM_ROUTER_SUBAGENT_GATE=enforce` only when you intentionally want
 this reminder to use Codex's documented `permissionDecision: "deny"` output for
 direct file writes until a native subagent has started. Set
@@ -464,9 +464,10 @@ Default plugin hook responsibilities:
 - `UserPromptSubmit`: detect likely engineering prompts, write
   `.codex/team-router/current-run.json` with `route_required`, and inject
   `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` through
-  `hookSpecificOutput.additionalContext`. For standard, complex, or high_risk
-  routes, that marker is routing context only; it does not authorize spawning
-  visible native subagents.
+  `hookSpecificOutput.additionalContext`. For standard, complex, high_risk, or
+  parallel_read routes, that marker is routing context and automatic
+  authorization for the skill's subagent policy, subject to opt-out,
+  high-risk confirmation, and native-tool availability gates.
 - `SessionStart`: write `.codex/team-router/health.json`, initialize or
   resume `.codex/team-router/current-run.json`, and report missing project
   custom-agent templates.

@@ -1,6 +1,6 @@
 {
   "name": "codex-team-router",
-  "version": "0.1.0",
+  "version": "0.1.0+codex.20260611071846",
   "description": "Route coding tasks before deciding main-thread or Codex native subagent execution.",
   "author": {
     "name": "zhiyu_liu"

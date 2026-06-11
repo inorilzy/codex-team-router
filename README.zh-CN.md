@@ -43,11 +43,11 @@ flowchart TD
   J -- "standard" --> L["计划、执行、审查"]
   J -- "complex" --> M["分析、计划、审查计划、执行、审查"]
   J -- "high_risk" --> N["分析、计划 gate、限定 executor、审查、验证"]
-  L --> O{"用户明确授权 subagents？"}
+  L --> O{"自动路由 gate 通过？"}
   M --> O
   N --> O
   O -- "是" --> P["工具可用时 spawn 可见的 Codex App subagents"]
-  O -- "否" --> Q["留在主线程，或先询问是否委派"]
+  O -- "否" --> Q["使用文档化的主线程 fallback"]
   P --> R["主线程整合、验证并汇报"]
   Q --> R
 ```
@@ -68,7 +68,7 @@ flowchart TD
 
 ## 它不会做什么
 
-- 它不会绕过 Codex 的 subagent 授权边界。hook marker `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` 只表示“这个请求需要路由并输出回执”，并不等于自动授权 spawn subagents。
+- 它不会绕过用户 opt-out、高风险确认或工具可用性 gate。hook marker `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` 对这个插件来说是自动路由授权，但如果任何 gate 阻止 spawn，仍会 fallback 到主线程。
 - 它不是完整的 oh-my-codex、OMO 或外部 multi-agent runtime。它没有 mailbox 系统、独立 worktree 池，也没有外部任务运行器。
 - 它不会强迫所有请求都走 subagents。简单的 terminal-only 请求应该留在主线程直接完成。
 
@@ -136,9 +136,9 @@ node plugins\codex-team-router\scripts\smoke-install.mjs
 router 会按 intent、domain 和 complexity 分类当前 prompt：
 
 ```text
-intent: implement; domain: visual; authorization: implicit
+intent: implement; domain: visual; authorization: auto
 prompt_complexity: medium; signals: frontend/ui, complete artifact
-team_route: standard; execution: main; reason: no explicit subagent authorization
+team_route: standard; execution: subagents; reason: automatic routing gates passed
 ```
 
 常见路由：
@@ -150,7 +150,7 @@ team_route: standard; execution: main; reason: no explicit subagent authorizatio
 - `complex`：完整用户界面 app、游戏、多步骤修改，或有实质风险的 review 工作。
 - `high_risk`：安全敏感、破坏性、迁移、架构调整，或影响面很大的任务。
 
-对于 `standard`、`complex` 或 `high_risk` 路由，Codex 应该在实现前先拆解任务。只有当用户明确要求 subagents、delegation、parallel work，或者 planner/executor/reviewer 工作流时，Codex 才应该 spawn 可见的原生 subagents；或者用户选择的插件 prompt 本身明确要求使用 subagents。
+对于 `standard`、`complex`、`parallel_read` 或 `high_risk` 路由，Codex 应该在实现前先拆解任务。在自动模式下，router marker 会授权这个 skill 在用户未 opt-out、高风险确认已满足、原生工具可用时选择可见的原生 subagents。
 
 ## 测试 prompt
 
@@ -193,10 +193,16 @@ team_route: standard; execution: main; reason: no explicit subagent authorizatio
 预期：注入 marker，并且 `team_route=high_risk`。
 
 ```text
+Review this repository for hook and doctor issues.
+```
+
+预期：注入 marker，并且 `authorization=auto`。当路由 gate 通过且工具可用时，Codex 可以使用可见的原生 subagents。
+
+```text
 Use planner/executor/reviewer subagents to create a small HTML app.
 ```
 
-预期：注入 marker，并且 `authorization=explicit`。如果工具可用，Codex 可以使用可见的原生 subagents。
+预期：注入 marker，并且 `authorization=explicit`。显式 subagent wording 仍会被记录，但自动模式不要求每个已路由工程 prompt 都重复这类 wording。
 
 ## Hooks 和环境变量
 

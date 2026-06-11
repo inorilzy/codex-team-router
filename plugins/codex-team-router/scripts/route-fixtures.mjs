@@ -72,7 +72,7 @@ const fixtures = [
     status: { route: "high_risk", prompt_complexity: "very_high" }
   },
   {
-    name: "explicit subagent authorization",
+    name: "explicit subagent wording",
     prompt: "Use planner/executor/reviewer subagents to create a small HTML app.",
     marker: true,
     routeRequired: true,

@@ -108,12 +108,13 @@ function tomlBool(section, key) {
   return match ? match[1] === "true" : null;
 }
 
-function runHook(event, payload) {
+function runHook(event, payload, env = {}) {
   return spawnSync(process.execPath, [hookScriptPath, event], {
     cwd: hookWorkspaceDir,
     input: `${JSON.stringify(payload)}\n`,
     encoding: "utf8",
-    timeout: 30000
+    timeout: 30000,
+    env: { ...process.env, ...env }
   });
 }
 
@@ -223,25 +224,35 @@ function checkPluginCli() {
 }
 
 function checkHookSimulation() {
-  const promptRun = runHook("UserPromptSubmit", {
+  const plainPromptRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
     prompt: "生成一个html 版本的飞机大战。"
   });
 
-  const output = parseHookStdout(promptRun, "UserPromptSubmit hook simulation");
+  const plainOutput = parseHookStdout(plainPromptRun, "Plain engineering prompt hook simulation");
+  if (!plainOutput) return;
+  record(!hookContextText(plainOutput).includes(routeMarker) ? "pass" : "fail", "Manual mode does not inject route marker for plain engineering prompts");
+
+  const promptRun = runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 生成一个html 版本的飞机大战。"
+  });
+
+  const output = parseHookStdout(promptRun, "Team command hook simulation");
   if (!output) return;
 
   const context = hookContextText(output);
-  record(context.includes(routeMarker) ? "pass" : "fail", "UserPromptSubmit injects route-required marker");
+  record(context.includes(routeMarker) ? "pass" : "fail", "Team command injects route-required marker");
   record(context.includes("tool_search") ? "pass" : "fail", "UserPromptSubmit tells the model to discover multi_agent_v1 with tool_search");
   record(context.includes("suggested_execution=subagents") ? "pass" : "fail", "Complex prompt suggests subagents");
-  record(context.includes("authorization=auto") ? "pass" : "fail", "Complex prompt records automatic subagent authorization");
-  record(context.includes("automatic authorization") ? "pass" : "fail", "UserPromptSubmit states hook marker can authorize spawning");
+  record(context.includes("source=team_command") ? "pass" : "fail", "Team command records source=team_command");
+  record(context.includes("authorization=explicit") ? "pass" : "fail", "Team command records explicit authorization");
+  record(context.includes("explicit team-mode routing context") ? "pass" : "fail", "UserPromptSubmit states team command can authorize routing");
   record(context.includes("user opt-out -> high-risk confirmation -> native-tool availability") ? "pass" : "fail", "UserPromptSubmit states automatic routing gates");
 
   const reviewZhRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
-    prompt: "检查一下这个插件的各个方面，看看还有没有改进和优化的空间。"
+    prompt: "team 检查一下这个插件的各个方面，看看还有没有改进和优化的空间。"
   });
   const reviewZhOutput = parseHookStdout(reviewZhRun, "Chinese review prompt hook simulation");
   if (!reviewZhOutput) return;
@@ -251,7 +262,7 @@ function checkHookSimulation() {
 
   const reviewEnRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
-    prompt: "review this plugin and find improvements"
+    prompt: "/team review this plugin and find improvements"
   });
   const reviewEnOutput = parseHookStdout(reviewEnRun, "English review prompt hook simulation");
   if (!reviewEnOutput) return;
@@ -260,17 +271,17 @@ function checkHookSimulation() {
 
   const parallelReadRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
-    prompt: "查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。"
+    prompt: "使用 team 查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。"
   });
   const parallelReadOutput = parseHookStdout(parallelReadRun, "Read-heavy scan prompt hook simulation");
   if (!parallelReadOutput) return;
   const parallelReadContext = hookContextText(parallelReadOutput);
   record(parallelReadContext.includes("team_route=parallel_read") ? "pass" : "fail", "Read-heavy scan routes to parallel_read");
-  record(parallelReadContext.includes("authorization=auto") ? "pass" : "fail", "Read-heavy scan uses automatic subagent authorization");
+  record(parallelReadContext.includes("authorization=explicit") ? "pass" : "fail", "Read-heavy scan uses explicit team authorization");
 
   const highRiskRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
-    prompt: "规划一次数据库权限迁移，涉及安全、回滚和发布验证。"
+    prompt: "team 规划一次数据库权限迁移，涉及安全、回滚和发布验证。"
   });
   const highRiskOutput = parseHookStdout(highRiskRun, "High-risk prompt hook simulation");
   if (!highRiskOutput) return;
@@ -280,6 +291,8 @@ function checkHookSimulation() {
   const explicitRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
     prompt: "Use planner/executor/reviewer subagents to create a small HTML app."
+  }, {
+    CODEX_TEAM_ROUTER_MODE: "auto"
   });
   const explicitOutput = parseHookStdout(explicitRun, "Explicit subagent prompt hook simulation");
   if (!explicitOutput) return;
@@ -296,7 +309,7 @@ function checkHookSimulation() {
 
   const standardRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
-    prompt: "创建一个简单的 HTML 计数器页面。"
+    prompt: "团队模式 创建一个简单的 HTML 计数器页面。"
   });
 
   const standardOutput = parseHookStdout(standardRun, "Medium prompt hook simulation");
@@ -320,13 +333,13 @@ function checkHookSimulation() {
   const preToolOutput = preToolRun.stdout.trim();
   record(preToolOutput.startsWith("{") ? "pass" : "fail", "PreToolUse emits JSON stdout");
   record(preToolOutput.includes("tool_search") ? "pass" : "warn", "PreToolUse reminder includes tool_search guidance");
-  record(preToolOutput.includes("automatic authorization") ? "pass" : "fail", "PreToolUse reminder preserves automatic subagent authorization");
+  record(preToolOutput.includes("authorization") ? "pass" : "fail", "PreToolUse reminder preserves routing authorization guidance");
 
   resetHookState();
 
   runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",
-    prompt: "修复这个插件的路由问题。"
+    prompt: "team 修复这个插件的路由问题。"
   });
   runHook("SubagentStart", {
     hook_event_name: "SubagentStart",

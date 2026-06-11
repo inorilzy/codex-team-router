@@ -1,6 +1,6 @@
 {
   "name": "codex-team-router",
-  "version": "0.1.0+codex.20260611083011",
+  "version": "0.1.0+codex.20260611091309",
   "description": "Route coding tasks before deciding main-thread or Codex native subagent execution.",
   "author": {
     "name": "zhiyu_liu"
@@ -26,9 +26,9 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Route this coding task before implementing",
-      "Use planner/executor/reviewer subagents for this task",
-      "Run a high-risk team-router workflow with native subagents"
+      "team Route this coding task before implementing",
+      "team Use planner/executor/reviewer subagents for this task",
+      "team Run a high-risk team-router workflow with native subagents"
     ]
   }
 }

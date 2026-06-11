@@ -26,58 +26,130 @@ const fixtures = [
   {
     name: "Chinese plugin review",
     prompt: "检查一下这个插件的各个方面，看看还有没有改进和优化的空间。",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "team Chinese plugin review",
+    prompt: "team 检查一下这个插件的各个方面，看看还有没有改进和优化的空间。",
     marker: true,
     routeRequired: true,
-    includes: ["intent=review", "domain=infra", "team_route=complex"],
-    status: { route: "complex", intent: "review", domain: "infra" }
+    includes: ["source=team_command", "authorization=explicit", "intent=review", "domain=infra", "team_route=complex"],
+    status: { route: "complex", intent: "review", domain: "infra", authorization: "explicit" }
   },
   {
     name: "English plugin review",
     prompt: "review this plugin and find improvements",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "slash team English plugin review",
+    prompt: "/team review this plugin and find improvements",
     marker: true,
     routeRequired: true,
-    includes: ["intent=review", "domain=infra"],
-    status: { intent: "review", domain: "infra" }
+    includes: ["source=team_command", "authorization=explicit", "intent=review", "domain=infra"],
+    status: { intent: "review", domain: "infra", authorization: "explicit" }
   },
   {
     name: "simple HTML counter",
     prompt: "创建一个简单的 HTML 计数器页面。",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "team simple HTML counter",
+    prompt: "团队模式 创建一个简单的 HTML 计数器页面。",
     marker: true,
     routeRequired: true,
-    includes: ["team_route=standard"],
-    status: { route: "standard" }
+    includes: ["source=team_command", "authorization=explicit", "team_route=standard"],
+    status: { route: "standard", authorization: "explicit" }
   },
   {
     name: "read-heavy repository scan",
     prompt: "查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "team read-heavy repository scan",
+    prompt: "使用 team 查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。",
     marker: true,
     routeRequired: true,
-    includes: ["intent=investigate", "domain=infra", "authorization=auto", "team_route=parallel_read"],
-    status: { route: "parallel_read", intent: "investigate", domain: "infra", authorization: "auto", execution: "subagents" }
+    includes: ["intent=investigate", "domain=infra", "authorization=explicit", "team_route=parallel_read"],
+    status: { route: "parallel_read", intent: "investigate", domain: "infra", authorization: "explicit", execution: "subagents" }
   },
   {
     name: "single-file physics game",
     prompt: "创建一个愤怒的小鸟小游戏，单 HTML 文件。",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "auto mode single-file physics game",
+    prompt: "创建一个愤怒的小鸟小游戏，单 HTML 文件。",
     marker: true,
     routeRequired: true,
-    includes: ["domain=game", "team_route=complex"],
-    status: { route: "complex", domain: "game" }
+    includes: ["source=auto_mode", "authorization=auto", "domain=game", "team_route=complex"],
+    status: { route: "complex", domain: "game", authorization: "auto" },
+    env: { CODEX_TEAM_ROUTER_MODE: "auto" }
+  },
+  {
+    name: "team single-file physics game",
+    prompt: "team 创建一个愤怒的小鸟小游戏，单 HTML 文件。",
+    marker: true,
+    routeRequired: true,
+    includes: ["domain=game", "team_route=complex", "authorization=explicit"],
+    status: { route: "complex", domain: "game", authorization: "explicit" }
   },
   {
     name: "high-risk security migration",
     prompt: "规划一次数据库权限迁移，涉及安全、回滚和发布验证。",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "team high-risk security migration",
+    prompt: "team 规划一次数据库权限迁移，涉及安全、回滚和发布验证。",
     marker: true,
     routeRequired: true,
-    includes: ["prompt_complexity=very_high", "team_route=high_risk"],
-    status: { route: "high_risk", prompt_complexity: "very_high" }
+    includes: ["prompt_complexity=very_high", "team_route=high_risk", "authorization=explicit"],
+    status: { route: "high_risk", prompt_complexity: "very_high", authorization: "explicit" }
   },
   {
     name: "explicit subagent wording",
     prompt: "Use planner/executor/reviewer subagents to create a small HTML app.",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "no team opt-out",
+    prompt: "no team 修复这个问题",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "Chinese team opt-out",
+    prompt: "不用 team 检查这个插件",
+    marker: false,
+    routeRequired: false
+  },
+  {
+    name: "team command subagent opt-out",
+    prompt: "team 不用 subagents 修复这个插件的问题",
+    marker: true,
+    routeRequired: true,
+    includes: ["source=team_command", "authorization=opt_out", "team_route=complex"],
+    status: { route: "complex", authorization: "opt_out" }
+  },
+  {
+    name: "auto mode explicit subagent wording",
+    prompt: "Use planner/executor/reviewer subagents to create a small HTML app.",
     marker: true,
     routeRequired: true,
     includes: ["authorization=explicit", "team_route=complex", "suggested_execution=subagents"],
-    status: { route: "complex", authorization: "explicit", execution: "subagents" }
+    status: { route: "complex", authorization: "explicit", execution: "subagents" },
+    env: { CODEX_TEAM_ROUTER_MODE: "auto" }
   }
 ];
 
@@ -86,11 +158,13 @@ function readJson(path) {
 }
 
 function runHook(cwd, event, payload) {
+  const { __env, ...hookPayload } = payload;
   const run = spawnSync(process.execPath, [hookScriptPath, event], {
     cwd,
-    input: `${JSON.stringify(payload)}\n`,
+    input: `${JSON.stringify(hookPayload)}\n`,
     encoding: "utf8",
-    timeout: 30000
+    timeout: 30000,
+    env: { ...process.env, ...(__env || {}) }
   });
 
   if (run.status !== 0) {
@@ -113,7 +187,8 @@ function checkFixture(fixture) {
   try {
     const output = runHook(tempDir, "UserPromptSubmit", {
       hook_event_name: "UserPromptSubmit",
-      prompt: fixture.prompt
+      prompt: fixture.prompt,
+      __env: fixture.env || {}
     });
     const context = output?.hookSpecificOutput?.additionalContext || "";
     const statusPath = join(tempDir, ".codex", "team-router", "status.json");

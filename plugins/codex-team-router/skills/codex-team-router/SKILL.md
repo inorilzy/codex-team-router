@@ -1,14 +1,14 @@
 ---
 name: codex-team-router
-description: "Use as the engineering task router for coding work: create, modify, fix, refactor, review, validate, or build code, including HTML/frontend apps and games. First decide whether to stay in the main thread, spawn a bounded executor, or use visible Codex App planner/executor/reviewer subagents. Use even when the user does not explicitly mention subagents; do not use for casual chat or simple terminal-only questions."
+description: "Use as the explicit team-mode router for coding work when the user invokes `team`, `/team`, `团队模式`, or asks for this skill/plugin. Decide whether to stay in the main thread, spawn a bounded executor, or use visible Codex App planner/executor/reviewer subagents. Do not use for ordinary coding questions unless the hook injects CODEX_TEAM_ROUTER_ROUTE_REQUIRED or the user explicitly requests team/subagent routing."
 ---
 
 # Codex Team Router
 
-Use this skill as the first routing layer for engineering tasks. It decides
-whether the main thread should handle the task directly or delegate planning,
-implementation, review, research, or validation to visible native Codex App
-subagents.
+Use this skill as the explicit team-mode routing layer for engineering tasks.
+It decides whether the main thread should handle the task directly or delegate
+planning, implementation, review, research, or validation to visible native
+Codex App subagents.
 
 This skill is a coordination protocol. It does not call an external runner.
 The main thread must use Codex App native `multi_agent_v1.spawn_agent`,
@@ -60,21 +60,24 @@ user explicitly forbids status text. This is the audit signal that distinguishes
 user-facing exact-output tasks, keep the receipt concise or include it in the
 final status instead of interrupting the requested artifact.
 
-Native subagents are preferred when prompt complexity shows that delegation
-materially improves planning, implementation, review, validation, or visible
-coordination in the Codex App subagent panel. When this skill is selected,
-explicitly invoked, or injected by its routing hook for an engineering task, it
-authorizes its own complexity-based delegation policy by default. The user does
-not need to repeat "use subagents" for every task. Explicit wording such as
+Native subagents are preferred inside team mode when prompt complexity shows
+that delegation materially improves planning, implementation, review,
+validation, or visible coordination in the Codex App subagent panel. By
+default, the hook enters team mode only when the user starts with `team`,
+`/team`, `团队模式`, or `使用 team`. Set `CODEX_TEAM_ROUTER_MODE=auto` to
+restore automatic engineering-prompt detection. Explicit wording such as
 subagents, delegation, parallel work, or planner/executor/reviewer still counts
-as `authorization: explicit`; otherwise use `authorization: auto`.
+as `authorization: explicit`; automatic hook selection is
+`authorization: auto`.
 
 A `UserPromptSubmit` hook injection containing
 `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is routing context that requires the visible
-routing receipt and prevents silent un-routed implementation. For `standard`,
-`complex`, `high_risk`, or `parallel_read` routes, it also means the skill may
-automatically spawn visible native Codex App subagents when that is the chosen
-execution mode.
+routing receipt and prevents silent un-routed implementation. In default manual
+mode, this marker is injected only for explicit team commands. In
+`CODEX_TEAM_ROUTER_MODE=auto`, it may also be injected for detected engineering
+prompts. For `standard`, `complex`, `high_risk`, or `parallel_read` routes, the
+marker means the skill may spawn visible native Codex App subagents when that
+is the chosen execution mode.
 
 For `implement` and `fix` routes, `execution: subagents` means an executor or
 worker subagent owns the primary file edits. Planner, analyst, reviewer, or
@@ -336,7 +339,7 @@ default route table:
   straightforward single-file UI, simple arcade mechanics, or small CRUD flows.
   When the skill chooses subagent execution, spawn `planner`, `executor`, and
   `reviewer` in canonical order. Treat `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as
-  automatic routing authorization. Apply the subagent execution gates before
+  team/auto routing authorization. Apply the subagent execution gates before
   spawning.
 - `parallel_read`: when the skill chooses subagent execution, spawn one or more
   `explorer` agents or use CSV fan-out for read-heavy scans.
@@ -345,7 +348,7 @@ default route table:
   product/design judgment, game mechanics, nontrivial validation, or likely
   >50 lines of coherent new work. When the skill chooses subagent execution,
   spawn `analyst`, `planner`, `plan-reviewer`, `executor`, and `reviewer` in
-  canonical order. Treat `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as automatic routing
+  canonical order. Treat `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` as team/auto routing
   authorization. Apply the subagent execution gates before spawning.
 - `high_risk`: spawn `analyst`, `planner`, `plan-reviewer`, one or more
   `executor` agents, `reviewer`, and `verifier` when subagent tools are
@@ -357,12 +360,12 @@ Route conservatively for casual or tiny tasks, but do not let "single file" hide
 real prompt complexity. If the user explicitly invokes `Codex Team Router`,
 selects the plugin for a coding task, or the hook injects
 `CODEX_TEAM_ROUTER_ROUTE_REQUIRED`, always emit the routing receipt and apply
-the complexity-based delegation policy. Wording such as "use subagents", "spawn
-agents", "delegate", "parallel", "planner/executor/reviewer", "用 subagent",
-"委派", or "并行" marks the receipt as `authorization: explicit`; otherwise use
-`authorization: auto`. Do not use "no explicit subagent wording" as a reason to
-stay in the main thread for `standard`, `complex`, `high_risk`, or
-`parallel_read` prompts. Instead, apply the three subagent execution gates:
+the complexity-based delegation policy. A `team`, `/team`, `团队模式`, or
+`使用 team` command marks the receipt as `authorization: explicit`; auto-mode
+hook selection marks it as `authorization: auto`. Do not use "no explicit
+subagent wording" as a reason to stay in the main thread after the marker
+exists for `standard`, `complex`, `high_risk`, or `parallel_read` prompts.
+Instead, apply the three subagent execution gates:
 respect user opt-out, pause for high-risk confirmation, then discover/check
 `multi_agent_v1`. If a high-risk confirmation is granted, continue to the
 native-tool availability check; if confirmation is declined or not granted,
@@ -434,8 +437,9 @@ Registry rules:
 
 ## Optional Hooks Layer
 
-The skill works without hooks. Add hooks when the user wants automatic team
-traceability, policy checks, or completion gates.
+The skill works without hooks. Add hooks when the user wants explicit team
+commands, optional automatic team routing, health checks, audit logging,
+lifecycle tracking, policy checks, or completion gates.
 
 When this skill is installed from the `codex-team-router` plugin, Codex can
 load the bundled plugin hooks from `hooks/hooks.json` after the user reviews and
@@ -452,9 +456,10 @@ To install the bundled hook helper in a project:
 3. Review and trust the hook definitions with `/hooks` when Codex asks.
 
 The hooks are mostly warn-only by default, with one deliberate gate:
-`UserPromptSubmit` adds routing context when the prompt looks like an engineering
-task, but it cannot directly invoke a skill. The visible routing receipt remains
-the proof that the skill was used. `PreToolUse` is warn-only by default for
+`UserPromptSubmit` adds routing context only when the prompt explicitly enters
+team mode, unless `CODEX_TEAM_ROUTER_MODE=auto` restores engineering-prompt
+detection. The visible routing receipt remains the proof that the skill was
+used. `PreToolUse` is warn-only by default for
 `standard`, `complex`, and `high_risk` routed prompts: it reminds the model to
 emit the receipt and apply the automatic routing gates before direct writes.
 Set `CODEX_TEAM_ROUTER_SUBAGENT_GATE=enforce` only when you intentionally want
@@ -470,13 +475,15 @@ accepted as compatibility aliases.
 
 Default plugin hook responsibilities:
 
-- `UserPromptSubmit`: detect likely engineering prompts, write
+- `UserPromptSubmit`: in default manual mode, detect explicit `team`, `/team`,
+  `团队模式`, or `使用 team` commands, write
   `.codex/team-router/current-run.json` with `route_required`, and inject
   `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` through
-  `hookSpecificOutput.additionalContext`. For standard, complex, high_risk, or
-  parallel_read routes, that marker is routing context and automatic
-  authorization for the skill's subagent policy, subject to opt-out,
-  high-risk confirmation, and native-tool availability gates.
+  `hookSpecificOutput.additionalContext`. With `CODEX_TEAM_ROUTER_MODE=auto`,
+  the hook also detects likely engineering prompts. For standard, complex,
+  high_risk, or parallel_read routes, that marker is routing context for the
+  skill's subagent policy, subject to opt-out, high-risk confirmation, and
+  native-tool availability gates.
 - `SessionStart`: write `.codex/team-router/health.json`, initialize or
   resume `.codex/team-router/current-run.json`, and report missing project
   custom-agent templates.

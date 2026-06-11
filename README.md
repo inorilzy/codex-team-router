@@ -6,10 +6,11 @@ Chinese version: [README.zh-CN.md](README.zh-CN.md).
 
 Release notes: [CHANGELOG.md](CHANGELOG.md).
 
-Codex Team Router is a Codex plugin for routing engineering tasks before work
-starts. It helps Codex decide whether a coding request should stay in the main
-thread, use a bounded executor, or use visible Codex App native subagents such
-as planner, executor, reviewer, explorer, and verifier.
+Codex Team Router is a Codex plugin for explicit team-mode routing before work
+starts. By default it activates only when a prompt starts with `team` or
+`/team` (Chinese aliases are documented in `README.zh-CN.md`). It helps Codex decide whether a coding request
+should stay in the main thread, use a bounded executor, or use visible Codex App
+native subagents such as planner, executor, reviewer, explorer, and verifier.
 
 The public plugin id and skill id are both:
 
@@ -36,7 +37,7 @@ flowchart TD
   A["User sends a prompt"] --> B{"Simple terminal-only request?"}
   B -- "Yes" --> C["Main thread runs the command"]
   B -- "No" --> D["UserPromptSubmit hook checks the prompt"]
-  D --> E{"Engineering task?"}
+  D --> E{"Explicit team command or auto mode?"}
   E -- "No" --> F["No router marker"]
   E -- "Yes" --> G["Inject CODEX_TEAM_ROUTER_ROUTE_REQUIRED"]
   G --> H["Codex uses the codex-team-router skill"]
@@ -46,7 +47,7 @@ flowchart TD
   J -- "standard" --> L["Plan, execute, review"]
   J -- "complex" --> M["Analyze, plan, review plan, execute, review"]
   J -- "high_risk" --> N["Analyze, gated plan, scoped executors, review, verify"]
-  L --> O{"Automatic routing gates pass?"}
+  L --> O{"Routing gates pass?"}
   M --> O
   N --> O
   O -- "Yes" --> P["Spawn visible Codex App subagents when tools are available"]
@@ -64,6 +65,10 @@ flowchart TD
 - Adds optional plugin hooks for:
   `UserPromptSubmit`, `SessionStart`, `PreToolUse`, `SubagentStart`,
   `SubagentStop`, and `Stop`.
+- Defaults to manual team mode. Use `team <task>` or `/team <task>` to enter
+  the router. Set
+  `CODEX_TEAM_ROUTER_MODE=auto` to restore automatic engineering-prompt
+  detection.
 - Bundles custom-agent templates for:
   `analyst`, `planner`, `plan-reviewer`, `executor`, `reviewer`, `explorer`,
   and `verifier`.
@@ -79,7 +84,7 @@ flowchart TD
 ## What it does not do
 
 - It does not bypass opt-out, high-risk confirmation, or tool-availability
-  gates. The hook marker `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is automatic routing
+  gates. The hook marker `CODEX_TEAM_ROUTER_ROUTE_REQUIRED` is team/auto routing
   authorization for this plugin, but spawning still falls back to the main
   thread when a gate blocks it.
 - It is not a full oh-my-codex, OMO, or external multi-agent runtime. There is
@@ -153,12 +158,16 @@ node plugins\codex-team-router\scripts\smoke-install.mjs
 
 ## Expected routing behavior
 
-The router classifies the current prompt by intent, domain, and complexity:
+In default manual mode, start a prompt with `team` or `/team` to enter the
+router. Plain engineering prompts do not inject the route marker unless
+`CODEX_TEAM_ROUTER_MODE=auto` is set.
+
+The router classifies the routed task by intent, domain, and complexity:
 
 ```text
-intent: implement; domain: visual; authorization: auto
+intent: implement; domain: visual; authorization: explicit
 prompt_complexity: medium; signals: frontend/ui, complete artifact
-team_route: standard; execution: subagents; reason: automatic routing gates passed
+team_route: standard; execution: subagents; reason: team routing gates passed
 ```
 
 Typical routes:
@@ -173,9 +182,9 @@ Typical routes:
   high-blast-radius work.
 
 For `standard`, `complex`, `parallel_read`, or `high_risk` routes, Codex should
-decompose the task before implementation. In automatic mode, the router marker
-authorizes the skill to choose visible native subagents when the opt-out,
-high-risk confirmation, and native-tool availability gates allow it.
+decompose the task before implementation. The router marker authorizes the
+skill to choose visible native subagents when the opt-out, high-risk
+confirmation, and native-tool availability gates allow it.
 
 ## Test prompts
 
@@ -191,17 +200,36 @@ Expected: no route-required marker. This is a simple terminal-only request.
 Review this plugin and find improvements.
 ```
 
-Expected: marker is injected, intent is `review`, domain is `infra`, and
-`team_route=complex`.
+Expected: no route-required marker in default manual mode.
+
+```text
+team Review this plugin and find improvements.
+```
+
+Expected: marker is injected, intent is `review`, domain is `infra`,
+`authorization=explicit`, and `team_route=complex`.
 
 ```text
 Create a simple HTML counter page.
 ```
 
-Expected: marker is injected and `team_route=standard`.
+Expected: no route-required marker in default manual mode.
+
+```text
+/team Create a simple HTML counter page.
+```
+
+Expected: marker is injected, `authorization=explicit`, and
+`team_route=standard`.
 
 ```text
 Create an Angry Birds-style mini game in a single HTML file.
+```
+
+Expected: no route-required marker in default manual mode.
+
+```text
+team Create an Angry Birds-style mini game in a single HTML file.
 ```
 
 Expected: marker is injected and `team_route=complex`, because the prompt
@@ -211,11 +239,23 @@ implies projectile motion, collision, scoring, and game state.
 Scan this repository for hook and doctor issues without changing files.
 ```
 
+Expected: no route-required marker in default manual mode.
+
+```text
+team Scan this repository for hook and doctor issues without changing files.
+```
+
 Expected: marker is injected, intent is `investigate`, and
 `team_route=parallel_read`.
 
 ```text
 Plan a database permission migration with security, rollback, and release validation.
+```
+
+Expected: no route-required marker in default manual mode.
+
+```text
+team Plan a database permission migration with security, rollback, and release validation.
 ```
 
 Expected: marker is injected and `team_route=high_risk`.
@@ -224,23 +264,24 @@ Expected: marker is injected and `team_route=high_risk`.
 Review this repository for hook and doctor issues.
 ```
 
-Expected: marker is injected and `authorization=auto`. Codex may use visible
-native subagents when the routing gates pass and the tools are available.
+Expected: no route-required marker in default manual mode. With
+`CODEX_TEAM_ROUTER_MODE=auto`, marker is injected and `authorization=auto`.
 
 ```text
 Use planner/executor/reviewer subagents to create a small HTML app.
 ```
 
-Expected: marker is injected and `authorization=explicit`. Explicit subagent
-wording is still recorded, but automatic mode does not require repeating that
-wording for every routed engineering prompt.
+Expected: no route-required marker in default manual mode unless prefixed with
+`team`. With `CODEX_TEAM_ROUTER_MODE=auto`, marker is injected and
+`authorization=explicit`.
 
 ## Hooks and environment variables
 
 The bundled plugin hooks are intentionally minimal:
 
-- `UserPromptSubmit`: detects likely engineering prompts and injects routing
-  context.
+- `UserPromptSubmit`: detects explicit team commands and injects routing
+  context. With `CODEX_TEAM_ROUTER_MODE=auto`, it also detects likely
+  engineering prompts.
 - `SessionStart`: writes team-router health state.
 - `PreToolUse`: warns before implementation-like tools when a routed prompt has
   not produced a visible routing decision yet.
@@ -257,6 +298,7 @@ Default mode is warn-only. Optional environment variables:
 ```text
 CODEX_TEAM_ROUTER_SUBAGENT_GATE=warn|enforce|off
 CODEX_TEAM_ROUTER_HOOK_MODE=warn|enforce
+CODEX_TEAM_ROUTER_MODE=manual|auto
 ```
 
 Legacy aliases are also accepted:

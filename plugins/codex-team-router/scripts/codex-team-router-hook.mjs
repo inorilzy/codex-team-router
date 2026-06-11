@@ -13,6 +13,7 @@ const gatePath = join(routerDir, "completion-gate.json");
 const statusPath = join(routerDir, "status.json");
 const mode = process.env.CODEX_TEAM_ROUTER_HOOK_MODE || process.env.SQUAD_HOOK_MODE || "warn";
 const subagentGate = process.env.CODEX_TEAM_ROUTER_SUBAGENT_GATE || process.env.SQUAD_SUBAGENT_GATE || "warn";
+const routerMode = (process.env.CODEX_TEAM_ROUTER_MODE || "manual").toLowerCase();
 const routeReminderTools = /(?:shell|exec|command|apply_patch|edit|write|read|grep|rg|find|search|view|open|multi_agent|spawn)/i;
 let emittedOutput = false;
 
@@ -162,6 +163,8 @@ function writeStatus(state) {
     run_id: state.run_id || null,
     status: state.status || "running",
     route_required: state.route_required?.required === true,
+    route_source: state.route_required?.source || null,
+    router_mode: state.route_required?.router_mode || null,
     route: routeLevel(state),
     intent: classification.intent || null,
     domain: classification.domain || null,
@@ -280,6 +283,30 @@ function isSimpleTerminalPrompt(prompt) {
   return /^(运行|run|execute)\s+[`"']?[^`"']+[`"']?\s*(然后结束|and stop|then stop)?\s*$/i.test(prompt.trim());
 }
 
+function detectTeamCommand(prompt) {
+  const trimmed = String(prompt || "").trim();
+  if (!trimmed) return { matched: false, optOut: false, taskPrompt: "" };
+
+  if (/^(?:no\s+team|without\s+team|do\s+not\s+use\s+team|don't\s+use\s+team|不用\s*team|不要\s*team|别用\s*team|禁止\s*team)\b/i.test(trimmed)) {
+    return { matched: false, optOut: true, taskPrompt: trimmed };
+  }
+
+  const patterns = [
+    /^(?:\/team|team)(?:\s*[:：-]\s*|\s+)([\s\S]+)$/i,
+    /^团队模式(?:\s*[:：-]\s*|\s+)([\s\S]+)$/i,
+    /^使用\s*team(?:\s*[:：-]\s*|\s+)([\s\S]+)$/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match) {
+      return { matched: true, optOut: false, taskPrompt: match[1].trim() || trimmed };
+    }
+  }
+
+  return { matched: false, optOut: false, taskPrompt: trimmed };
+}
+
 function classifyPrompt(prompt) {
   const signals = [];
   let intent = "answer";
@@ -377,24 +404,39 @@ function isEngineeringPrompt(prompt) {
 
 function userPromptSubmit(payload) {
   const prompt = String(detectPrompt(payload) || "");
-  if (!isEngineeringPrompt(prompt)) {
+  const teamCommand = detectTeamCommand(prompt);
+  const autoMode = routerMode === "auto";
+  const routePrompt = teamCommand.matched ? teamCommand.taskPrompt : prompt;
+
+  if (teamCommand.optOut || (!teamCommand.matched && !autoMode) || !isEngineeringPrompt(routePrompt)) {
     const state = loadState();
     state.status = "no_route_required";
-    state.route_required = { required: false, cleared_at: now(), source: "UserPromptSubmit" };
+    state.route_required = {
+      required: false,
+      cleared_at: now(),
+      source: "UserPromptSubmit",
+      router_mode: autoMode ? "auto" : "manual",
+      reason: teamCommand.optOut ? "team_mode_opt_out" : teamCommand.matched ? "not_engineering_prompt" : "team_command_required"
+    };
     state.pre_tool_route_reminder_sent = false;
     state.hook_events.push({ event, at: now(), route_required: false });
     saveState(state);
     return;
   }
 
-  const classification = classifyPrompt(prompt);
+  const classification = classifyPrompt(routePrompt);
+  if (teamCommand.matched && classification.authorization !== "opt_out") {
+    classification.authorization = "explicit";
+  }
   const state = loadState();
   state.status = "routing_required";
   state.route_required = {
     required: true,
     detected_at: now(),
-    source: "UserPromptSubmit",
-    prompt_preview: prompt.slice(0, 240),
+    source: teamCommand.matched ? "team_command" : "UserPromptSubmit",
+    router_mode: autoMode ? "auto" : "manual",
+    prompt_preview: routePrompt.slice(0, 240),
+    original_prompt_preview: prompt.slice(0, 240),
     classification
   };
   state.pre_tool_route_reminder_sent = false;
@@ -404,15 +446,19 @@ function userPromptSubmit(payload) {
   const context = [
     "[Codex Team Router Hook]",
     "CODEX_TEAM_ROUTER_ROUTE_REQUIRED",
-    "The current user prompt looks like an engineering task. Before implementation work, use the `codex-team-router` skill as the routing layer.",
+    teamCommand.matched
+      ? "The user explicitly entered Codex Team Router team mode. Before implementation work, use the `codex-team-router` skill as the routing layer."
+      : "The current user prompt looks like an engineering task and CODEX_TEAM_ROUTER_MODE=auto. Before implementation work, use the `codex-team-router` skill as the routing layer.",
     "Emit the visible routing receipt so the user can distinguish: skill not used vs. skill used and routed to main vs. skill used and spawned subagents.",
     "Required receipt shape:",
     "intent: <answer|investigate|implement|fix|review|plan|terminal>; domain: <general|visual|game|logic|writing|git|data|infra>; authorization: <auto|explicit|opt_out|blocked>",
     "prompt_complexity: <low|medium|high|very_high>; signals: <short signals>",
     "team_route: <trivial|small|standard|parallel_read|complex|high_risk>; execution: <main|executor|subagents>; reason: <short reason>",
-    `Hook pre-classification: intent=${classification.intent}; domain=${classification.domain}; authorization=${classification.authorization}; prompt_complexity=${classification.prompt_complexity}; team_route=${classification.team_route}; suggested_execution=${classification.execution}; signals=${classification.signals}.`,
-    "For standard, complex, high_risk, or parallel_read engineering prompts, this marker is routing context and automatic authorization for the codex-team-router skill to choose visible subagents unless the user opted out or the task needs high-risk confirmation.",
-    "Use `authorization=auto` for hook-selected subagent execution, `authorization=explicit` when the user directly asked for subagents/delegation/parallel work, `authorization=opt_out` when the user forbids subagents, and `authorization=blocked` when tool policy or risk blocks spawning.",
+    `Hook pre-classification: source=${teamCommand.matched ? "team_command" : "auto_mode"}; intent=${classification.intent}; domain=${classification.domain}; authorization=${classification.authorization}; prompt_complexity=${classification.prompt_complexity}; team_route=${classification.team_route}; suggested_execution=${classification.execution}; signals=${classification.signals}.`,
+    teamCommand.matched
+      ? "This marker is explicit team-mode routing context for the codex-team-router skill to choose visible subagents unless the user opted out or the task needs high-risk confirmation."
+      : "For standard, complex, high_risk, or parallel_read engineering prompts, this marker is routing context and automatic authorization for the codex-team-router skill to choose visible subagents unless the user opted out or the task needs high-risk confirmation.",
+    "Use `authorization=explicit` for team-command routing, `authorization=auto` only when CODEX_TEAM_ROUTER_MODE=auto selected the route, `authorization=opt_out` when the user forbids team/subagent routing, and `authorization=blocked` when tool policy or risk blocks spawning.",
     "Routing gates apply in this order: user opt-out -> high-risk confirmation -> native-tool availability.",
     "If high-risk confirmation is granted, continue to the native-tool availability check; if confirmation is declined or not granted, emit the fallback receipt and continue with the documented main-thread fallback without spawning.",
     "If `multi_agent_v1` is not visible and the route calls for subagents, use tool discovery first. In Codex App, call `tool_search` with query `multi_agent_v1 spawn_agent native subagent Codex App`, then return to the native-tool availability check instead of falling back immediately.",
@@ -520,7 +566,7 @@ function preToolUse(payload) {
     const reason = [
       opening,
       "This prompt was routed as standard/complex/high_risk and requires a visible routing receipt before implementation edits.",
-      "The hook marker authorizes automatic subagent routing for this skill unless the user opted out or the task needs high-risk confirmation.",
+      "The hook marker authorizes team routing for this skill when the user entered team mode or CODEX_TEAM_ROUTER_MODE=auto selected the route, unless the user opted out or the task needs high-risk confirmation.",
       "Apply the routing gates in order: opt-out, then high-risk confirmation, then native-tool availability.",
       "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
       "Discover `multi_agent_v1` if needed, then return to the availability check and spawn bounded subagents when the route calls for them.",
@@ -547,7 +593,7 @@ function preToolUse(payload) {
       "CODEX_TEAM_ROUTER_ROUTE_REMINDER",
       "This prompt was pre-classified as standard/complex/high_risk engineering work.",
       "Do not route to main-thread implementation merely because `multi_agent_v1` is not currently visible.",
-      "The hook marker is sufficient automatic authorization for this skill to spawn subagents unless the user opted out or the task needs high-risk confirmation.",
+      "The hook marker is sufficient routing authorization for this skill to spawn subagents when the user entered team mode or CODEX_TEAM_ROUTER_MODE=auto selected the route, unless the user opted out or the task needs high-risk confirmation.",
       "Apply the routing gates in order: opt-out, then high-risk confirmation, then native-tool availability.",
       "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
       "If `multi_agent_v1` is hidden, call `tool_search` for `multi_agent_v1 spawn_agent native subagent Codex App`, then return to the availability check and spawn a planner/executor/reviewer or the closest available fallback role.",

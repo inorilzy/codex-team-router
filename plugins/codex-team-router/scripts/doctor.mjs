@@ -341,6 +341,192 @@ function checkHookSimulation() {
     hook_event_name: "UserPromptSubmit",
     prompt: "team 修复这个插件的路由问题。"
   });
+  const missingFallbackDecisionRun = runHook("RouteDecision", {
+    hook_event_name: "RouteDecision",
+    desired_execution: "subagents",
+    final_execution: "main",
+    required_roles: ["planner", "executor", "reviewer"],
+    decision_reason: "native subagent fallback selected"
+  });
+  parseHookStdout(missingFallbackDecisionRun, "RouteDecision missing fallback simulation");
+
+  const missingFallbackWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+  if (missingFallbackWriteRun.status !== 0) {
+    record("fail", "Missing fallback RouteDecision write simulation exited non-zero", missingFallbackWriteRun.stderr || missingFallbackWriteRun.stdout);
+    return;
+  }
+  const missingFallbackOutput = missingFallbackWriteRun.stdout.trim();
+  record(missingFallbackOutput.includes("fallback_reason") ? "pass" : "fail", "Main fallback without fallback_reason reminds to record fallback");
+  record(!missingFallbackOutput.includes("permissionDecision") ? "pass" : "fail", "Missing fallback reminder does not deny main-thread write");
+
+  resetHookState();
+
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 修复这个插件的路由问题。"
+  });
+  const mainFallbackDecisionRun = runHook("RouteDecision", {
+    hook_event_name: "RouteDecision",
+    desired_execution: "subagents",
+    final_execution: "main",
+    required_roles: ["planner", "executor", "reviewer"],
+    fallback_reason: "multi_agent_v1 unavailable after discovery",
+    decision_reason: "main-thread fallback after native-tool availability gate"
+  });
+  parseHookStdout(mainFallbackDecisionRun, "RouteDecision main fallback simulation");
+
+  const mainFallbackWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+  if (mainFallbackWriteRun.status !== 0) {
+    record("fail", "Main fallback RouteDecision write simulation exited non-zero", mainFallbackWriteRun.stderr || mainFallbackWriteRun.stdout);
+    return;
+  }
+  const mainFallbackOutput = mainFallbackWriteRun.stdout.trim();
+  record(!mainFallbackOutput.includes("executor/worker") ? "pass" : "fail", "RouteDecision final_execution=main allows main-thread write", mainFallbackOutput);
+
+  const mainFallbackStatus = readJson(runtimeStatusPath);
+  if (mainFallbackStatus) {
+    record(mainFallbackStatus.decision_recorded === true ? "pass" : "fail", "Runtime status records RouteDecision presence");
+    record(mainFallbackStatus.route_source === "route_decision" ? "pass" : "fail", "Runtime status uses RouteDecision as route_source", `route_source=${mainFallbackStatus.route_source}`);
+    record(mainFallbackStatus.desired_execution === "subagents" ? "pass" : "fail", "Runtime status records desired_execution", `desired_execution=${mainFallbackStatus.desired_execution}`);
+    record(mainFallbackStatus.final_execution === "main" ? "pass" : "fail", "Runtime status records final_execution=main", `final_execution=${mainFallbackStatus.final_execution}`);
+    record(Array.isArray(mainFallbackStatus.required_roles) && mainFallbackStatus.required_roles.includes("executor") ? "pass" : "fail", "Runtime status records required_roles", JSON.stringify(mainFallbackStatus.required_roles));
+    record(mainFallbackStatus.fallback_reason === "multi_agent_v1 unavailable after discovery" ? "pass" : "fail", "Runtime status records fallback_reason", String(mainFallbackStatus.fallback_reason || ""));
+    record(mainFallbackStatus.decision_reason === "main-thread fallback after native-tool availability gate" ? "pass" : "fail", "Runtime status records decision_reason", String(mainFallbackStatus.decision_reason || ""));
+  }
+
+  resetHookState();
+
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 修复这个插件的路由问题。"
+  });
+  runHook("RouteDecision", {
+    hook_event_name: "RouteDecision",
+    desired_execution: "subagents",
+    final_execution: "main",
+    fallback_reason: "main-thread small task",
+    decision_reason: "old decision that should be cleared"
+  });
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 创建一个简单的 HTML 计数器页面。"
+  });
+  const clearedDecisionStatus = readJson(runtimeStatusPath);
+  if (clearedDecisionStatus) {
+    record(clearedDecisionStatus.decision_recorded === false ? "pass" : "fail", "New UserPromptSubmit clears stale RouteDecision");
+    record(clearedDecisionStatus.route_source === "team_command" ? "pass" : "fail", "Runtime status falls back to preclassification source after stale decision clear", `route_source=${clearedDecisionStatus.route_source}`);
+  }
+
+  resetHookState();
+
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 修复这个插件的路由问题。"
+  });
+  const subagentsDecisionRun = runHook("RouteDecision", {
+    hook_event_name: "RouteDecision",
+    desired_execution: "subagents",
+    final_execution: "subagents",
+    required_roles: ["planner", "executor", "reviewer"],
+    decision_reason: "native subagents selected"
+  });
+  parseHookStdout(subagentsDecisionRun, "RouteDecision subagents simulation");
+  runHook("SubagentStart", {
+    hook_event_name: "SubagentStart",
+    subagent_type: "planner",
+    role_id: "planner"
+  });
+
+  const decisionPlannerOnlyWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+  if (decisionPlannerOnlyWriteRun.status !== 0) {
+    record("fail", "RouteDecision planner-only write gate simulation exited non-zero", decisionPlannerOnlyWriteRun.stderr || decisionPlannerOnlyWriteRun.stdout);
+    return;
+  }
+  const decisionPlannerOnlyWriteOutput = decisionPlannerOnlyWriteRun.stdout.trim();
+  record(decisionPlannerOnlyWriteOutput.includes("executor/worker") ? "pass" : "fail", "RouteDecision subagents planner-only write still requires executor/worker");
+
+  runHook("SubagentStart", {
+    hook_event_name: "SubagentStart",
+    subagent_type: "worker",
+    role_id: "worker"
+  });
+
+  const decisionWorkerWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+  if (decisionWorkerWriteRun.status !== 0) {
+    record("fail", "RouteDecision worker write gate simulation exited non-zero", decisionWorkerWriteRun.stderr || decisionWorkerWriteRun.stdout);
+    return;
+  }
+  const decisionWorkerWriteOutput = decisionWorkerWriteRun.stdout.trim();
+  record(!decisionWorkerWriteOutput.includes("executor/worker") ? "pass" : "fail", "RouteDecision worker start satisfies implementation write gate", decisionWorkerWriteOutput);
+
+  resetHookState();
+
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 修复这个插件的路由问题。"
+  });
+  runHook("RouteDecision", {
+    hook_event_name: "RouteDecision",
+    desired_execution: "subagents",
+    final_execution: "executor",
+    required_roles: ["executor"],
+    decision_reason: "bounded executor selected"
+  });
+  runHook("SubagentStart", {
+    hook_event_name: "SubagentStart",
+    subagent_type: "planner",
+    role_id: "planner"
+  });
+  const executorDecisionPlannerWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+  if (executorDecisionPlannerWriteRun.status !== 0) {
+    record("fail", "RouteDecision executor planner-only write gate simulation exited non-zero", executorDecisionPlannerWriteRun.stderr || executorDecisionPlannerWriteRun.stdout);
+    return;
+  }
+  const executorDecisionPlannerWriteOutput = executorDecisionPlannerWriteRun.stdout.trim();
+  record(executorDecisionPlannerWriteOutput.includes("executor/worker") ? "pass" : "fail", "RouteDecision final_execution=executor requires executor/worker");
+  runHook("SubagentStart", {
+    hook_event_name: "SubagentStart",
+    subagent_type: "executor",
+    role_id: "executor"
+  });
+  const executorDecisionExecutorWriteRun = runHook("PreToolUse", {
+    hook_event_name: "PreToolUse",
+    tool_name: "shell_command",
+    tool_input: { command: "Set-Content -Path app.html -Value test" }
+  });
+  if (executorDecisionExecutorWriteRun.status !== 0) {
+    record("fail", "RouteDecision executor write gate simulation exited non-zero", executorDecisionExecutorWriteRun.stderr || executorDecisionExecutorWriteRun.stdout);
+    return;
+  }
+  const executorDecisionExecutorWriteOutput = executorDecisionExecutorWriteRun.stdout.trim();
+  record(!executorDecisionExecutorWriteOutput.includes("executor/worker") ? "pass" : "fail", "RouteDecision final_execution=executor is satisfied by executor start", executorDecisionExecutorWriteOutput);
+
+  resetHookState();
+
+  runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "team 修复这个插件的路由问题。"
+  });
   runHook("SubagentStart", {
     hook_event_name: "SubagentStart",
     subagent_type: "planner",
@@ -360,7 +546,7 @@ function checkHookSimulation() {
 
   const plannerOnlyWriteOutput = plannerOnlyWriteRun.stdout.trim();
   record(plannerOnlyWriteOutput.startsWith("{") ? "pass" : "fail", "Planner-only implementation write still emits JSON stdout");
-  record(plannerOnlyWriteOutput.includes("executor/worker") ? "pass" : "fail", "Planner-only implementation write still requires executor/worker");
+  record(plannerOnlyWriteOutput.includes("executor/worker") ? "pass" : "fail", "Planner-only implementation write without RouteDecision still requires executor/worker");
 
   runHook("SubagentStart", {
     hook_event_name: "SubagentStart",
@@ -380,7 +566,7 @@ function checkHookSimulation() {
   }
 
   const workerWriteOutput = workerWriteRun.stdout.trim();
-  record(!workerWriteOutput.includes("executor/worker") ? "pass" : "fail", "Executor/worker start satisfies implementation write gate", workerWriteOutput);
+  record(!workerWriteOutput.includes("executor/worker") ? "pass" : "fail", "Executor/worker start without RouteDecision satisfies implementation write gate", workerWriteOutput);
 }
 
 function checkRuntimeStatusSummary() {

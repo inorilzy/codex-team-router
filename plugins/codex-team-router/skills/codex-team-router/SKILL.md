@@ -60,6 +60,26 @@ user explicitly forbids status text. This is the audit signal that distinguishes
 user-facing exact-output tasks, keep the receipt concise or include it in the
 final status instead of interrupting the requested artifact.
 
+After the visible receipt, record the final routing decision when the hook
+helper is installed. The hook pre-classification is only a suggestion; the
+`RouteDecision` record is the final state used by status and write gates. Set
+`desired_execution` to the preferred route before availability/fallback checks,
+`final_execution` to the path actually chosen (`main`, `executor`, or
+`subagents`), and include `fallback_reason` whenever
+`desired_execution=subagents` falls back to `final_execution=main`.
+
+From the plugin source root:
+
+```bash
+printf '%s\n' '{"desired_execution":"subagents","final_execution":"main","required_roles":["planner","executor","reviewer"],"fallback_reason":"multi_agent_v1 unavailable after discovery","decision_reason":"main-thread fallback after native-tool availability gate"}' | node scripts/codex-team-router-hook.mjs RouteDecision
+```
+
+PowerShell equivalent:
+
+```powershell
+'{"desired_execution":"subagents","final_execution":"subagents","required_roles":["planner","executor","reviewer"],"decision_reason":"standard route with native subagents available"}' | node scripts/codex-team-router-hook.mjs RouteDecision
+```
+
 Native subagents are preferred inside team mode when prompt complexity shows
 that delegation materially improves planning, implementation, review,
 validation, or visible coordination in the Codex App subagent panel. By

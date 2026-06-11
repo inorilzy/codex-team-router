@@ -85,8 +85,55 @@ function countAgents(state, status) {
   return (state.agents || []).filter((agent) => agent.status === status).length;
 }
 
+function routeDecision(state) {
+  return state.route_decision && typeof state.route_decision === "object" ? state.route_decision : null;
+}
+
+function normalizeExecution(value) {
+  const execution = String(value || "").trim().toLowerCase();
+  return execution === "main" || execution === "executor" || execution === "subagents" ? execution : null;
+}
+
+function normalizeText(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeRequiredRoles(value) {
+  if (Array.isArray(value)) {
+    return value.map((role) => String(role || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value.split(/[,\s]+/).map((role) => role.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function decisionDesiredExecution(state) {
+  const decision = routeDecision(state);
+  return decision?.desired_execution || state.route_required?.classification?.execution || null;
+}
+
+function decisionFinalExecution(state) {
+  const decision = routeDecision(state);
+  return decision?.final_execution || state.route_required?.classification?.execution || null;
+}
+
 function routeClassification(state) {
-  return state.route_required?.classification || {};
+  const classification = state.route_required?.classification || {};
+  const decision = routeDecision(state);
+  if (!decision) return classification;
+
+  return {
+    ...classification,
+    intent: decision.intent || classification.intent,
+    domain: decision.domain || classification.domain,
+    authorization: decision.authorization || classification.authorization,
+    prompt_complexity: decision.prompt_complexity || classification.prompt_complexity,
+    signals: decision.signals || classification.signals,
+    team_route: decision.team_route || classification.team_route,
+    squad_route: decision.squad_route || classification.squad_route,
+    execution: decision.final_execution || classification.execution
+  };
 }
 
 function routeLevel(state) {
@@ -95,13 +142,22 @@ function routeLevel(state) {
 }
 
 function deriveNextAction(state) {
+  const decision = routeDecision(state);
   const routeRequired = state.route_required?.required === true;
   const route = routeLevel(state);
+  const finalExecution = decisionFinalExecution(state);
+  const desiredExecution = decisionDesiredExecution(state);
   const runningAgents = countAgents(state, "running");
   const validationCount = (state.validation_evidence || []).length;
 
   if (!routeRequired) {
     return "No team-router action is required for the current prompt.";
+  }
+  if (decision && finalExecution === "main") {
+    if (desiredExecution === "subagents" && !decision.fallback_reason) {
+      return "Record the RouteDecision fallback_reason for the main-thread fallback, then continue in the main thread.";
+    }
+    return "Continue in the main thread according to the recorded RouteDecision.";
   }
   if (runningAgents > 0) {
     return "Wait for running subagents, then integrate their results in the main thread.";
@@ -124,9 +180,13 @@ function deriveNextAction(state) {
 }
 
 function buildTaskBoard(state) {
+  const decision = routeDecision(state);
   const routeRequired = state.route_required?.required === true;
   const route = routeLevel(state);
-  const delegatedRoute = route === "parallel_read" || route === "standard" || route === "complex" || route === "high_risk";
+  const finalExecution = decisionFinalExecution(state);
+  const delegatedRoute = decision
+    ? finalExecution === "subagents" || finalExecution === "executor"
+    : route === "parallel_read" || route === "standard" || route === "complex" || route === "high_risk";
   const agentsStarted = hasRequiredSubagentStarted(state);
   const validationCount = (state.validation_evidence || []).length;
 
@@ -137,7 +197,7 @@ function buildTaskBoard(state) {
     },
     {
       item: "Emit routing receipt",
-      status: routeRequired ? "pending_model_action" : "not_required"
+      status: routeRequired ? (decision ? "completed" : "pending_model_action") : "not_required"
     },
     {
       item: "Start routed subagents",
@@ -151,7 +211,10 @@ function buildTaskBoard(state) {
 }
 
 function writeStatus(state) {
+  const decision = routeDecision(state);
   const classification = routeClassification(state);
+  const desiredExecution = decisionDesiredExecution(state);
+  const finalExecution = decisionFinalExecution(state);
   const agents = state.agents || [];
   const warnings = state.warnings || [];
   const validationEvidence = state.validation_evidence || [];
@@ -163,7 +226,7 @@ function writeStatus(state) {
     run_id: state.run_id || null,
     status: state.status || "running",
     route_required: state.route_required?.required === true,
-    route_source: state.route_required?.source || null,
+    route_source: decision ? "route_decision" : state.route_required?.source || null,
     router_mode: state.route_required?.router_mode || null,
     route: routeLevel(state),
     intent: classification.intent || null,
@@ -171,6 +234,12 @@ function writeStatus(state) {
     authorization: classification.authorization || null,
     prompt_complexity: classification.prompt_complexity || null,
     execution: classification.execution || null,
+    decision_recorded: Boolean(decision),
+    desired_execution: desiredExecution,
+    final_execution: finalExecution,
+    required_roles: decision?.required_roles || [],
+    fallback_reason: decision?.fallback_reason || null,
+    decision_reason: decision?.decision_reason || null,
     prompt_preview: state.route_required?.prompt_preview || null,
     agents: {
       total: agents.length,
@@ -241,14 +310,35 @@ function isSubagentSpawnTool(tool, command) {
 }
 
 function needsSubagentBeforeWrite(state) {
-  const route = state.route_required?.classification?.team_route || state.route_required?.classification?.squad_route || "";
-  const execution = state.route_required?.classification?.execution || "";
+  const decision = routeDecision(state);
+  if (decision) {
+    const execution = decisionFinalExecution(state);
+    if (execution === "main") return false;
+    if (execution === "subagents" || execution === "executor") return true;
+  }
+
+  const classification = state.route_required?.classification || {};
+  const route = classification.team_route || classification.squad_route || "";
+  const execution = classification.execution || "";
   return state.route_required?.required === true && (route === "standard" || route === "complex" || route === "high_risk" || execution === "subagents");
 }
 
 function isDelegatedRoute(state) {
-  const route = state.route_required?.classification?.team_route || state.route_required?.classification?.squad_route || "";
+  const decision = routeDecision(state);
+  if (decision) {
+    const execution = decisionFinalExecution(state);
+    if (execution === "main") return false;
+    if (execution === "subagents" || execution === "executor") return true;
+  }
+
+  const classification = state.route_required?.classification || {};
+  const route = classification.team_route || classification.squad_route || "";
   return state.route_required?.required === true && (route === "standard" || route === "complex" || route === "high_risk");
+}
+
+function shouldRemindMissingFallbackReason(state) {
+  const decision = routeDecision(state);
+  return decision && decision.desired_execution === "subagents" && decision.final_execution === "main" && !decision.fallback_reason;
 }
 
 function hasSubagentStarted(state) {
@@ -256,7 +346,7 @@ function hasSubagentStarted(state) {
 }
 
 function isImplementationIntent(state) {
-  const intent = state.route_required?.classification?.intent || "";
+  const intent = routeClassification(state).intent || "";
   return intent === "implement" || intent === "fix";
 }
 
@@ -276,6 +366,7 @@ function hasExecutorStarted(state) {
 }
 
 function hasRequiredSubagentStarted(state) {
+  if (routeDecision(state)?.final_execution === "executor") return hasExecutorStarted(state);
   return isImplementationIntent(state) ? hasExecutorStarted(state) : hasSubagentStarted(state);
 }
 
@@ -402,6 +493,52 @@ function isEngineeringPrompt(prompt) {
   return /(代码|实现|修改|修复|重构|创建|生成|开发|写.*(?:html|css|js|代码|脚本)|检查|审查|验证|优化|改进|插件|配置|发布|查找|梳理|调查|迁移|权限|安全|架构|build|create|implement|modify|change|fix|refactor|add|make|code|review|validate|qa|plugin|hooks?|skill|config|publish|improvements?|scan|explore|investigate|survey|migration|permission|security|architecture|html|css|javascript|typescript|react|vue|网页|页面|app|应用|工具|dashboard|仪表盘|game|小游戏|游戏|可玩|交互|canvas|bug|test|lint)/i.test(prompt);
 }
 
+function normalizeRouteDecision(payload, state) {
+  const input = payload.route_decision || payload.decision || payload;
+  const classification = state.route_required?.classification || {};
+  const finalExecution = normalizeExecution(input.final_execution ?? input.finalExecution ?? input.actual_execution ?? input.actualExecution ?? input.execution);
+  const desiredExecution = normalizeExecution(input.desired_execution ?? input.desiredExecution ?? input.suggested_execution ?? input.suggestedExecution) || normalizeExecution(classification.execution) || finalExecution;
+  const teamRoute = normalizeText(input.team_route ?? input.teamRoute ?? input.route) || classification.team_route || classification.squad_route || null;
+
+  return {
+    recorded_at: now(),
+    source: input.source || "RouteDecision",
+    intent: normalizeText(input.intent) || classification.intent || null,
+    domain: normalizeText(input.domain) || classification.domain || null,
+    authorization: normalizeText(input.authorization) || classification.authorization || null,
+    prompt_complexity: normalizeText(input.prompt_complexity ?? input.promptComplexity) || classification.prompt_complexity || null,
+    signals: normalizeText(input.signals) || classification.signals || null,
+    team_route: teamRoute,
+    squad_route: normalizeText(input.squad_route ?? input.squadRoute) || classification.squad_route || null,
+    desired_execution: desiredExecution,
+    final_execution: finalExecution || desiredExecution || null,
+    required_roles: normalizeRequiredRoles(input.required_roles ?? input.requiredRoles),
+    fallback_reason: normalizeText(input.fallback_reason ?? input.fallbackReason),
+    decision_reason: normalizeText(input.decision_reason ?? input.decisionReason ?? input.reason)
+  };
+}
+
+function routeDecisionEvent(payload) {
+  const state = loadState();
+  const decision = normalizeRouteDecision(payload, state);
+
+  state.status = "route_decision_recorded";
+  state.route_decision = decision;
+  state.pre_tool_route_decision_fallback_reminder_sent = false;
+  state.hook_events.push({
+    event,
+    at: now(),
+    route_decision: {
+      desired_execution: decision.desired_execution,
+      final_execution: decision.final_execution,
+      required_roles: decision.required_roles,
+      fallback_reason: decision.fallback_reason,
+      decision_reason: decision.decision_reason
+    }
+  });
+  saveState(state);
+}
+
 function userPromptSubmit(payload) {
   const prompt = String(detectPrompt(payload) || "");
   const teamCommand = detectTeamCommand(prompt);
@@ -410,6 +547,7 @@ function userPromptSubmit(payload) {
 
   if (teamCommand.optOut || (!teamCommand.matched && !autoMode) || !isEngineeringPrompt(routePrompt)) {
     const state = loadState();
+    delete state.route_decision;
     state.status = "no_route_required";
     state.route_required = {
       required: false,
@@ -419,6 +557,7 @@ function userPromptSubmit(payload) {
       reason: teamCommand.optOut ? "team_mode_opt_out" : teamCommand.matched ? "not_engineering_prompt" : "team_command_required"
     };
     state.pre_tool_route_reminder_sent = false;
+    state.pre_tool_route_decision_fallback_reminder_sent = false;
     state.hook_events.push({ event, at: now(), route_required: false });
     saveState(state);
     return;
@@ -429,6 +568,7 @@ function userPromptSubmit(payload) {
     classification.authorization = "explicit";
   }
   const state = loadState();
+  delete state.route_decision;
   state.status = "routing_required";
   state.route_required = {
     required: true,
@@ -440,6 +580,7 @@ function userPromptSubmit(payload) {
     classification
   };
   state.pre_tool_route_reminder_sent = false;
+  state.pre_tool_route_decision_fallback_reminder_sent = false;
   state.hook_events.push({ event, at: now(), route_required: true, classification });
   saveState(state);
 
@@ -541,6 +682,7 @@ function preToolUse(payload) {
   if (!state.status || state.status === "running") state.status = "tool_use_observed";
   const routeRequired = state.route_required?.required === true;
   const shouldGateSubagent = subagentGate !== "off" && needsSubagentBeforeWrite(state);
+  const directWrite = isWriteTool(tool, command) && !isSubagentSpawnTool(tool, command);
 
   if (command && isRiskyCommand(command)) {
     const warning = {
@@ -559,13 +701,34 @@ function preToolUse(payload) {
     }
   }
 
-  if (shouldGateSubagent && isWriteTool(tool, command) && !isSubagentSpawnTool(tool, command) && !hasRequiredSubagentStarted(state)) {
+  if (directWrite && shouldRemindMissingFallbackReason(state) && !state.pre_tool_route_decision_fallback_reminder_sent) {
+    const reason = [
+      "Codex Team Router RouteDecision reminder.",
+      "The recorded decision has desired_execution=subagents and final_execution=main, but fallback_reason is empty.",
+      "Main-thread writes are allowed by final_execution=main, but record why subagent execution fell back before relying on the decision for audit.",
+      "Update the decision with `fallback_reason`, for example by running the hook subcommand `RouteDecision` again with the same final_execution and a short fallback_reason."
+    ].join(" ");
+    const record = { event, at: now(), tool, command: command || null, message: reason };
+    state.pre_tool_route_decision_fallback_reminder_sent = true;
+    state.warnings.push(record);
+    state.hook_events.push(record);
+    saveState(state);
+    appendAudit(record);
+    emitJson(hookContext("PreToolUse", reason));
+    return;
+  }
+
+  if (shouldGateSubagent && directWrite && !hasRequiredSubagentStarted(state)) {
+    const finalExecution = routeDecision(state)?.final_execution || null;
     const opening = subagentGate === "warn"
       ? "Codex Team Router route reminder for this delegated engineering task."
       : "Codex Team Router strict gate blocked direct file editing for this delegated engineering task.";
+    const decisionSummary = finalExecution
+      ? `The recorded RouteDecision has final_execution=${finalExecution}.`
+      : "This prompt was routed as standard/complex/high_risk and requires a visible routing receipt before implementation edits.";
     const reason = [
       opening,
-      "This prompt was routed as standard/complex/high_risk and requires a visible routing receipt before implementation edits.",
+      decisionSummary,
       "The hook marker authorizes team routing for this skill when the user entered team mode or CODEX_TEAM_ROUTER_MODE=auto selected the route, unless the user opted out or the task needs high-risk confirmation.",
       "Apply the routing gates in order: opt-out, then high-risk confirmation, then native-tool availability.",
       "If high-risk confirmation is granted, continue to native-tool availability; if it is declined or not granted, emit the fallback receipt and do not spawn.",
@@ -587,7 +750,7 @@ function preToolUse(payload) {
     return;
   }
 
-  if (routeRequired && !hasRequiredSubagentStarted(state) && !state.pre_tool_route_reminder_sent && routeReminderTools.test(tool || command)) {
+  if (routeRequired && routeDecision(state)?.final_execution !== "main" && !hasRequiredSubagentStarted(state) && !state.pre_tool_route_reminder_sent && routeReminderTools.test(tool || command)) {
     const warning = isDelegatedRoute(state) ? [
       "[Codex Team Router Hook]",
       "CODEX_TEAM_ROUTER_ROUTE_REMINDER",
@@ -684,6 +847,11 @@ appendAudit({ event, at: now(), cwd: resolve(cwd), payload_keys: Object.keys(pay
 switch (event) {
   case "UserPromptSubmit":
     userPromptSubmit(payload);
+    break;
+  case "RouteDecision":
+  case "route-decision":
+  case "routeDecision":
+    routeDecisionEvent(payload);
     break;
   case "SessionStart":
     sessionStart(payload);

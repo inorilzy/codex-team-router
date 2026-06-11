@@ -73,4 +73,5 @@ git commit -m "<change summary>"
 git push
 ```
 
-After push, confirm the `Source Check` workflow passed on GitHub.
+After push, confirm the `Source Check` workflow passed on both Ubuntu and
+Windows on GitHub.

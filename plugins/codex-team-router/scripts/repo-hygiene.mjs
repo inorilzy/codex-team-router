@@ -100,6 +100,14 @@ function checkRuntimeArtifacts() {
   );
 }
 
+function checkCiWorkflow() {
+  const workflow = readText(".github/workflows/source-check.yml");
+
+  record(workflow.includes("ubuntu-latest"), "Source Check runs on Ubuntu");
+  record(workflow.includes("windows-latest"), "Source Check runs on Windows");
+  record(workflow.includes("node-version: \"22\""), "Source Check pins Node.js 22");
+}
+
 try {
   console.log("Codex Team Router repo hygiene");
   console.log(`Repo root: ${repoRoot}`);
@@ -110,6 +118,7 @@ try {
   checkPluginManifest();
   checkSkillIdentity();
   checkRuntimeArtifacts();
+  checkCiWorkflow();
 
   const failCount = checks.filter((check) => !check.ok).length;
   console.log("");

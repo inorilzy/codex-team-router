@@ -1,5 +1,7 @@
 # Codex Team Router
 
+[![Source Check](https://github.com/inorilzy/codex-team-router/actions/workflows/source-check.yml/badge.svg)](https://github.com/inorilzy/codex-team-router/actions/workflows/source-check.yml)
+
 Chinese version: [README.zh-CN.md](README.zh-CN.md).
 
 Codex Team Router is a Codex plugin for routing engineering tasks before work
@@ -287,9 +289,9 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
   bundled/global custom-agent drift.
 
 The GitHub Actions workflow runs `route-fixtures.mjs`, `repo-hygiene.mjs`, and
-`doctor.mjs --source-only` through `check-source.mjs`, so pull requests can
-validate the source tree without needing a Codex App profile or local model
-catalog.
+`doctor.mjs --source-only` through `check-source.mjs` on Ubuntu and Windows, so
+pull requests can validate the source tree without needing a Codex App profile
+or local model catalog.
 
 See [docs/release-checklist.md](docs/release-checklist.md) for the full
 pre-publish checklist.

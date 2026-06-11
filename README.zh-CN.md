@@ -1,5 +1,7 @@
 # Codex Team Router
 
+[![Source Check](https://github.com/inorilzy/codex-team-router/actions/workflows/source-check.yml/badge.svg)](https://github.com/inorilzy/codex-team-router/actions/workflows/source-check.yml)
+
 英文版：[README.md](README.md)。
 
 Codex Team Router 是一个 Codex 插件，用来在工程任务开始前先做路由判断。它会帮助 Codex 判断当前请求应该留在主线程完成，还是应该使用有边界的 executor，或者使用 Codex App 里可见的原生 subagent，例如 planner、executor、reviewer、explorer 和 verifier。
@@ -238,7 +240,7 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 - `scripts/doctor.mjs --source-only`：只检查源码树结构、hook 模拟、runtime status summary 和 bundled custom-agent 模板，不需要本地 Codex 安装。
 - `scripts/doctor.mjs`：检查插件结构、hook 模拟、模型 catalog fallback、runtime status summary、安装状态、hook trust，以及 bundled/global custom-agent 是否漂移。
 
-GitHub Actions workflow 会通过 `check-source.mjs` 运行 `route-fixtures.mjs`、`repo-hygiene.mjs` 和 `doctor.mjs --source-only`，所以 pull request 可以在没有 Codex App profile 或本地模型 catalog 的环境里验证源码树。
+GitHub Actions workflow 会在 Ubuntu 和 Windows 上通过 `check-source.mjs` 运行 `route-fixtures.mjs`、`repo-hygiene.mjs` 和 `doctor.mjs --source-only`，所以 pull request 可以在没有 Codex App profile 或本地模型 catalog 的环境里验证源码树。
 
 完整发布前检查见 [docs/release-checklist.md](docs/release-checklist.md)。
 

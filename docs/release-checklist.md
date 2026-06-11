@@ -19,6 +19,10 @@ The command runs:
 - `scripts/repo-hygiene.mjs --json`
 - `scripts/doctor.mjs --source-only --json`
 
+`route-fixtures.mjs` should cover simple terminal prompts, casual chat, review
+prompts, standard UI work, `parallel_read`, complex game work, `high_risk`, and
+explicit subagent authorization.
+
 ## Plugin validation
 
 When Codex's local validation helpers are available, run:

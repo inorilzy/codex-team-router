@@ -47,12 +47,36 @@ const fixtures = [
     status: { route: "standard" }
   },
   {
+    name: "read-heavy repository scan",
+    prompt: "查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。",
+    marker: true,
+    routeRequired: true,
+    includes: ["intent=investigate", "domain=infra", "authorization=none", "team_route=parallel_read"],
+    status: { route: "parallel_read", intent: "investigate", domain: "infra", authorization: "none", execution: "subagents" }
+  },
+  {
     name: "single-file physics game",
     prompt: "创建一个愤怒的小鸟小游戏，单 HTML 文件。",
     marker: true,
     routeRequired: true,
     includes: ["domain=game", "team_route=complex"],
     status: { route: "complex", domain: "game" }
+  },
+  {
+    name: "high-risk security migration",
+    prompt: "规划一次数据库权限迁移，涉及安全、回滚和发布验证。",
+    marker: true,
+    routeRequired: true,
+    includes: ["prompt_complexity=very_high", "team_route=high_risk"],
+    status: { route: "high_risk", prompt_complexity: "very_high" }
+  },
+  {
+    name: "explicit subagent authorization",
+    prompt: "Use planner/executor/reviewer subagents to create a small HTML app.",
+    marker: true,
+    routeRequired: true,
+    includes: ["authorization=explicit", "team_route=complex", "suggested_execution=subagents"],
+    status: { route: "complex", authorization: "explicit", execution: "subagents" }
   }
 ];
 

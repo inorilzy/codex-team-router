@@ -179,10 +179,22 @@ team_route: standard; execution: main; reason: no explicit subagent authorizatio
 预期：注入 marker，并且 `team_route=complex`，因为这个 prompt 隐含抛物线、碰撞、计分和游戏状态。
 
 ```text
+查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。
+```
+
+预期：注入 marker，intent 是 `investigate`，并且 `team_route=parallel_read`。
+
+```text
+规划一次数据库权限迁移，涉及安全、回滚和发布验证。
+```
+
+预期：注入 marker，并且 `team_route=high_risk`。
+
+```text
 Use planner/executor/reviewer subagents to create a small HTML app.
 ```
 
-预期：这是明确的 subagent 授权。如果工具可用，Codex 可以使用可见的原生 subagents。
+预期：注入 marker，并且 `authorization=explicit`。如果工具可用，Codex 可以使用可见的原生 subagents。
 
 ## Hooks 和环境变量
 

@@ -76,6 +76,9 @@ Router without turning the plugin into a separate runtime.
   plugin identity, skill identity, and runtime artifact boundaries under CI.
 - Add machine-readable JSON health reports for repo hygiene and doctor checks,
   then exercise those report modes from the single source-check command.
+- Expand route fixtures to cover read-heavy `parallel_read`, `high_risk`, and
+  explicit subagent authorization paths, not only common standard/complex
+  prompts.
 
 ## Not adopted yet
 

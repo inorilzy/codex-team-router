@@ -230,6 +230,7 @@ function checkHookSimulation() {
   record(context.includes(routeMarker) ? "pass" : "fail", "UserPromptSubmit injects route-required marker");
   record(context.includes("tool_search") ? "pass" : "fail", "UserPromptSubmit tells the model to discover multi_agent_v1 with tool_search");
   record(context.includes("suggested_execution=subagents") ? "pass" : "fail", "Complex prompt suggests subagents");
+  record(context.includes("authorization=none") ? "pass" : "fail", "Complex prompt records no explicit subagent authorization");
   record(!context.includes("implicit authorization") ? "pass" : "fail", "UserPromptSubmit does not claim hook marker authorizes spawning");
   record(context.includes("explicitly asks for subagents") ? "pass" : "fail", "UserPromptSubmit states explicit subagent authorization boundary");
 
@@ -251,6 +252,34 @@ function checkHookSimulation() {
   if (!reviewEnOutput) return;
   const reviewEnContext = hookContextText(reviewEnOutput);
   record(reviewEnContext.includes(routeMarker) ? "pass" : "fail", "English review prompt injects route-required marker");
+
+  const parallelReadRun = runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "查找这个仓库里 hooks 和 doctor 的实现，梳理潜在问题，不要修改文件。"
+  });
+  const parallelReadOutput = parseHookStdout(parallelReadRun, "Read-heavy scan prompt hook simulation");
+  if (!parallelReadOutput) return;
+  const parallelReadContext = hookContextText(parallelReadOutput);
+  record(parallelReadContext.includes("team_route=parallel_read") ? "pass" : "fail", "Read-heavy scan routes to parallel_read");
+  record(parallelReadContext.includes("authorization=none") ? "pass" : "fail", "Read-heavy scan does not imply subagent authorization");
+
+  const highRiskRun = runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "规划一次数据库权限迁移，涉及安全、回滚和发布验证。"
+  });
+  const highRiskOutput = parseHookStdout(highRiskRun, "High-risk prompt hook simulation");
+  if (!highRiskOutput) return;
+  const highRiskContext = hookContextText(highRiskOutput);
+  record(highRiskContext.includes("team_route=high_risk") ? "pass" : "fail", "High-risk prompt routes to high_risk");
+
+  const explicitRun = runHook("UserPromptSubmit", {
+    hook_event_name: "UserPromptSubmit",
+    prompt: "Use planner/executor/reviewer subagents to create a small HTML app."
+  });
+  const explicitOutput = parseHookStdout(explicitRun, "Explicit subagent prompt hook simulation");
+  if (!explicitOutput) return;
+  const explicitContext = hookContextText(explicitOutput);
+  record(explicitContext.includes("authorization=explicit") ? "pass" : "fail", "Explicit subagent wording records authorization=explicit");
 
   const simpleRun = runHook("UserPromptSubmit", {
     hook_event_name: "UserPromptSubmit",

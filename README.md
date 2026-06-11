@@ -206,11 +206,24 @@ Expected: marker is injected and `team_route=complex`, because the prompt
 implies projectile motion, collision, scoring, and game state.
 
 ```text
+Scan this repository for hook and doctor issues without changing files.
+```
+
+Expected: marker is injected, intent is `investigate`, and
+`team_route=parallel_read`.
+
+```text
+Plan a database permission migration with security, rollback, and release validation.
+```
+
+Expected: marker is injected and `team_route=high_risk`.
+
+```text
 Use planner/executor/reviewer subagents to create a small HTML app.
 ```
 
-Expected: explicit subagent authorization. Codex may use visible native
-subagents when the tools are available.
+Expected: marker is injected and `authorization=explicit`. Codex may use
+visible native subagents when the tools are available.
 
 ## Hooks and environment variables
 

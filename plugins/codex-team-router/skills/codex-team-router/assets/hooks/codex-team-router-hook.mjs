@@ -113,13 +113,19 @@ function deriveNextAction(state) {
       return "Collect validation evidence before claiming completion.";
     }
   }
+  if (route === "parallel_read") {
+    if (!hasSubagentStarted(state)) {
+      return "Emit the routing receipt; use read-only exploration; spawn explorer subagents only if explicitly authorized, otherwise continue in the main thread.";
+    }
+    return "Synthesize read-only findings from the main thread after explorer work completes.";
+  }
   return "Continue from the visible routing receipt and keep the main thread responsible for final verification.";
 }
 
 function buildTaskBoard(state) {
   const routeRequired = state.route_required?.required === true;
   const route = routeLevel(state);
-  const delegatedRoute = route === "standard" || route === "complex" || route === "high_risk";
+  const delegatedRoute = route === "parallel_read" || route === "standard" || route === "complex" || route === "high_risk";
   const agentsStarted = hasSubagentStarted(state);
   const validationCount = (state.validation_evidence || []).length;
 
@@ -159,6 +165,7 @@ function writeStatus(state) {
     route: routeLevel(state),
     intent: classification.intent || null,
     domain: classification.domain || null,
+    authorization: classification.authorization || null,
     prompt_complexity: classification.prompt_complexity || null,
     execution: classification.execution || null,
     prompt_preview: state.route_required?.prompt_preview || null,
@@ -254,6 +261,9 @@ function classifyPrompt(prompt) {
   let intent = "answer";
   let domain = "general";
   let complexity = "low";
+  let routeOverride = null;
+  const hasImplementationNounOnly = /的实现/.test(prompt) && /(搜索|查找|查一下|找出|梳理|调查|只读|不要修改|不修改|scan|explore|investigate|survey|read-only|no edits|without changing)/i.test(prompt);
+  const hasEngineeringWriteVerb = !hasImplementationNounOnly && /(实现|修改|修复|重构|创建|生成|开发|写|build|create|implement|modify|change|fix|refactor|add|make|code)/i.test(prompt);
   const isTinyRequest = /(最小|简单|最简单|basic|tiny|quick|demo|示例|hello\s*world|只要|静态)/i.test(prompt);
   const hasFrontendSurface = /(html|css|canvas|svg|react|vue|svelte|frontend|前端|网页|页面|组件|ui|布局|动画|浏览器)/i.test(prompt);
   const hasCompleteArtifact = /(生成|创建|做一个|开发|实现|build|create|make|implement).{0,40}(html|网页|页面|app|应用|工具|dashboard|仪表盘|site|website|游戏|小游戏|版本|demo|编辑器|可视化)|(?:html|网页|页面)\s*(?:版本|版)|single[- ]?file|单文件|直接打开/i.test(prompt);
@@ -264,8 +274,10 @@ function classifyPrompt(prompt) {
   const hasReviewIntent = /(review|审查|检查|验证|validate|qa)/i.test(prompt);
   const hasPluginReviewShape = /(插件|plugin|hooks?|skill|agent|subagent|marketplace|manifest|doctor|配置|config|发布|publish|优化|改进|improvements?)/i.test(prompt);
   const hasBroadReviewShape = /(各个方面|整体|全局|全面|全方位|改进|优化|improvements?|all aspects|overall|comprehensive)/i.test(prompt);
+  const hasReadHeavyShape = /(搜索|查找|查一下|找出|梳理|调查|只读|不要修改|不修改|scan|explore|investigate|survey|find all|trace|map|read-only|no edits|without changing)/i.test(prompt);
+  const hasExplicitAuthorization = /(subagents?|sub-agents?|委派|并行|delegat|parallel work|planner\s*\/\s*executor\s*\/\s*reviewer|planner|executor|reviewer)/i.test(prompt);
 
-  if (/(实现|修改|修复|重构|创建|生成|开发|写|build|create|implement|modify|change|fix|refactor|add|make|code)/i.test(prompt)) {
+  if (hasEngineeringWriteVerb) {
     intent = /(修复|fix|bug|报错|失败|regression)/i.test(prompt) ? "fix" : "implement";
     signals.push("engineering verb");
   }
@@ -277,6 +289,15 @@ function classifyPrompt(prompt) {
       complexity = hasBroadReviewShape ? "high" : "medium";
       signals.push("plugin/workflow review");
     }
+  }
+  if (hasReadHeavyShape && !hasEngineeringWriteVerb && !(hasReviewIntent && hasPluginReviewShape && hasBroadReviewShape)) {
+    intent = hasReviewIntent ? "review" : "investigate";
+    if (/(仓库|代码|repo|repository|codebase|插件|plugin|hooks?|doctor|skill|agent|subagent)/i.test(prompt)) {
+      domain = "infra";
+    }
+    complexity = complexity === "very_high" ? "very_high" : "medium";
+    routeOverride = "parallel_read";
+    signals.push("read-heavy scan");
   }
   if (hasFrontendSurface) {
     domain = "visual";
@@ -310,12 +331,13 @@ function classifyPrompt(prompt) {
     signals.push("decomposition signal");
   }
 
-  const route = complexity === "very_high" ? "high_risk" : complexity === "high" ? "complex" : complexity === "medium" ? "standard" : "trivial";
-  const execution = route === "standard" || route === "complex" || route === "high_risk" ? "subagents" : "main";
+  const route = complexity === "very_high" ? "high_risk" : routeOverride || (complexity === "high" ? "complex" : complexity === "medium" ? "standard" : "trivial");
+  const execution = route === "parallel_read" || route === "standard" || route === "complex" || route === "high_risk" ? "subagents" : "main";
 
   return {
     intent,
     domain,
+    authorization: hasExplicitAuthorization ? "explicit" : "none",
     prompt_complexity: complexity,
     signals: signals.length ? signals.join(", ") : "none",
     team_route: route,
@@ -325,7 +347,7 @@ function classifyPrompt(prompt) {
 
 function isEngineeringPrompt(prompt) {
   if (!prompt || isSimpleTerminalPrompt(prompt)) return false;
-  return /(代码|实现|修改|修复|重构|创建|生成|开发|写.*(?:html|css|js|代码|脚本)|检查|审查|验证|优化|改进|插件|配置|发布|build|create|implement|modify|change|fix|refactor|add|make|code|review|validate|qa|plugin|hooks?|skill|config|publish|improvements?|html|css|javascript|typescript|react|vue|网页|页面|app|应用|工具|dashboard|仪表盘|game|小游戏|游戏|可玩|交互|canvas|bug|test|lint)/i.test(prompt);
+  return /(代码|实现|修改|修复|重构|创建|生成|开发|写.*(?:html|css|js|代码|脚本)|检查|审查|验证|优化|改进|插件|配置|发布|查找|梳理|调查|迁移|权限|安全|架构|build|create|implement|modify|change|fix|refactor|add|make|code|review|validate|qa|plugin|hooks?|skill|config|publish|improvements?|scan|explore|investigate|survey|migration|permission|security|architecture|html|css|javascript|typescript|react|vue|网页|页面|app|应用|工具|dashboard|仪表盘|game|小游戏|游戏|可玩|交互|canvas|bug|test|lint)/i.test(prompt);
 }
 
 function userPromptSubmit(payload) {
@@ -363,7 +385,7 @@ function userPromptSubmit(payload) {
     "intent: <answer|investigate|implement|fix|review|plan|terminal>; domain: <general|visual|game|logic|writing|git|data|infra>; authorization: <explicit|implicit|none>",
     "prompt_complexity: <low|medium|high|very_high>; signals: <short signals>",
     "team_route: <trivial|small|standard|parallel_read|complex|high_risk>; execution: <main|executor|subagents>; reason: <short reason>",
-    `Hook pre-classification: intent=${classification.intent}; domain=${classification.domain}; prompt_complexity=${classification.prompt_complexity}; team_route=${classification.team_route}; suggested_execution=${classification.execution}; signals=${classification.signals}.`,
+    `Hook pre-classification: intent=${classification.intent}; domain=${classification.domain}; authorization=${classification.authorization}; prompt_complexity=${classification.prompt_complexity}; team_route=${classification.team_route}; suggested_execution=${classification.execution}; signals=${classification.signals}.`,
     "For standard, complex, or high_risk engineering prompts, this marker is routing context only. It does not by itself grant user authorization to spawn subagents.",
     "Spawn visible native Codex App subagents only when the user explicitly asks for subagents, delegation, parallel work, planner/executor/reviewer, or explicitly selects a plugin prompt that asks for subagents.",
     "If subagent spawning is explicitly authorized and `multi_agent_v1` is not visible, use tool discovery first. In Codex App, call `tool_search` with query `multi_agent_v1 spawn_agent native subagent Codex App`; do not claim native subagent tools are unavailable before this discovery attempt.",

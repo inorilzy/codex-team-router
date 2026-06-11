@@ -81,6 +81,8 @@ Router without turning the plugin into a separate runtime.
   prompts.
 - Add machine-readable JSON output for route fixtures so routing regressions can
   be consumed by CI, dashboards, or external orchestrator adapters.
+- Add an aggregate `check-source.mjs --json` report and run it in CI, following
+  the same machine-readable status pattern used by CLI orchestrators.
 
 ## Not adopted yet
 

@@ -9,6 +9,7 @@ agents, or a model catalog:
 
 ```powershell
 node plugins\codex-team-router\scripts\check-source.mjs
+node plugins\codex-team-router\scripts\check-source.mjs --json
 ```
 
 The command runs:

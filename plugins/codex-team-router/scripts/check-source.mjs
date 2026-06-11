@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
+const jsonMode = process.argv.includes("--json");
 
 const textChecks = [
   {
@@ -49,6 +50,22 @@ function runTextCheck(check) {
   }
 }
 
+function collectTextCheck(check) {
+  const result = spawnSync(process.execPath, check.args, {
+    encoding: "utf8",
+    cwd: process.cwd(),
+    env: process.env
+  });
+
+  return {
+    name: check.name,
+    kind: "text",
+    ok: result.status === 0,
+    exit_code: result.status || 0,
+    output_tail: result.status === 0 ? "" : `${result.stdout || ""}${result.stderr || ""}`.slice(-4000)
+  };
+}
+
 function runJsonCheck(check) {
   console.log(`\n== ${check.name} ==`);
   const result = spawnSync(process.execPath, check.args, {
@@ -84,12 +101,75 @@ function runJsonCheck(check) {
   console.log(`PASS ${check.name}: ${failCount} fail(s), ${warnCount} warning(s), ${itemCount} item(s).`);
 }
 
-for (const check of textChecks) {
-  runTextCheck(check);
+function collectJsonCheck(check) {
+  const result = spawnSync(process.execPath, check.args, {
+    encoding: "utf8",
+    cwd: process.cwd(),
+    env: process.env
+  });
+
+  const collected = {
+    name: check.name,
+    kind: "json",
+    ok: false,
+    exit_code: result.status || 0,
+    report_summary: null,
+    output_tail: ""
+  };
+
+  if (result.status !== 0) {
+    collected.output_tail = `${result.stdout || ""}${result.stderr || ""}`.slice(-4000);
+    return collected;
+  }
+
+  try {
+    const report = JSON.parse(result.stdout);
+    collected.report_summary = report?.summary || null;
+    collected.ok = report?.summary?.fail_count === 0;
+    if (!collected.ok) {
+      collected.output_tail = result.stdout.slice(-4000);
+    }
+  } catch (error) {
+    collected.output_tail = `Invalid JSON: ${error.message}\n${result.stdout}`.slice(-4000);
+  }
+
+  return collected;
 }
 
-for (const check of jsonChecks) {
-  runJsonCheck(check);
+function printJsonReport(checks) {
+  const failCount = checks.filter((check) => !check.ok).length;
+  const warnCount = checks.reduce((count, check) => count + (check.report_summary?.warn_count || 0), 0);
+  console.log(JSON.stringify({
+    tool: "check-source",
+    summary: {
+      fail_count: failCount,
+      warn_count: warnCount,
+      check_count: checks.length,
+      text_check_count: textChecks.length,
+      json_check_count: jsonChecks.length
+    },
+    checks
+  }, null, 2));
+
+  if (failCount > 0) {
+    process.exit(1);
+  }
 }
 
-console.log("\nSource checks passed.");
+if (jsonMode) {
+  const checks = [
+    ...textChecks.map(collectTextCheck),
+    ...jsonChecks.map(collectJsonCheck)
+  ];
+  printJsonReport(checks);
+} else {
+  for (const check of textChecks) {
+    runTextCheck(check);
+  }
+
+  for (const check of jsonChecks) {
+    runJsonCheck(check);
+  }
+
+  console.log("\nSource checks passed.");
+}

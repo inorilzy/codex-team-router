@@ -108,6 +108,7 @@ function checkCiWorkflow() {
   record(workflow.includes("ubuntu-latest"), "Source Check runs on Ubuntu");
   record(workflow.includes("windows-latest"), "Source Check runs on Windows");
   record(workflow.includes("node-version: \"22\""), "Source Check pins Node.js 22");
+  record(workflow.includes("check-source.mjs --json"), "Source Check runs the aggregate JSON report");
 }
 
 try {

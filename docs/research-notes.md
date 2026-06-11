@@ -79,6 +79,8 @@ Router without turning the plugin into a separate runtime.
 - Expand route fixtures to cover read-heavy `parallel_read`, `high_risk`, and
   explicit subagent authorization paths, not only common standard/complex
   prompts.
+- Add machine-readable JSON output for route fixtures so routing regressions can
+  be consumed by CI, dashboards, or external orchestrator adapters.
 
 ## Not adopted yet
 

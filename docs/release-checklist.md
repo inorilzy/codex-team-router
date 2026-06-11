@@ -16,6 +16,7 @@ The command runs:
 - `scripts/route-fixtures.mjs`
 - `scripts/repo-hygiene.mjs`
 - `scripts/doctor.mjs --source-only`
+- `scripts/route-fixtures.mjs --json`
 - `scripts/repo-hygiene.mjs --json`
 - `scripts/doctor.mjs --source-only --json`
 

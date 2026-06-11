@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const hookScriptPath = join(scriptDir, "codex-team-router-hook.mjs");
 const marker = "CODEX_TEAM_ROUTER_ROUTE_REQUIRED";
+const jsonMode = process.argv.includes("--json");
 
 const fixtures = [
   {
@@ -144,7 +145,19 @@ function checkFixture(fixture) {
     assert(Array.isArray(status.task_board), `${fixture.name}: status.task_board missing`);
     assert(typeof status.next_action === "string" && status.next_action.length > 0, `${fixture.name}: status.next_action missing`);
 
-    return `PASS ${fixture.name}`;
+    return {
+      ok: true,
+      name: fixture.name,
+      prompt: fixture.prompt,
+      marker_expected: fixture.marker,
+      route_required_expected: fixture.routeRequired,
+      route: status.route || null,
+      intent: status.intent || null,
+      domain: status.domain || null,
+      authorization: status.authorization || null,
+      prompt_complexity: status.prompt_complexity || null,
+      execution: status.execution || null
+    };
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -155,10 +168,34 @@ try {
   for (const fixture of fixtures) {
     results.push(checkFixture(fixture));
   }
-  for (const result of results) console.log(result);
-  console.log(`Route fixture tests passed: ${fixtures.length}`);
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      tool: "route-fixtures",
+      summary: {
+        fail_count: 0,
+        fixture_count: fixtures.length
+      },
+      fixtures: results
+    }, null, 2));
+  } else {
+    for (const result of results) console.log(`PASS ${result.name}`);
+    console.log(`Route fixture tests passed: ${fixtures.length}`);
+  }
 } catch (error) {
-  for (const result of results) console.log(result);
-  console.error(`FAIL ${error.message}`);
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      tool: "route-fixtures",
+      summary: {
+        fail_count: 1,
+        fixture_count: fixtures.length,
+        completed_count: results.length
+      },
+      fixtures: results,
+      error: error.message
+    }, null, 2));
+  } else {
+    for (const result of results) console.log(`PASS ${result.name}`);
+    console.error(`FAIL ${error.message}`);
+  }
   process.exit(1);
 }

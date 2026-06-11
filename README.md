@@ -303,9 +303,12 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 - `scripts/repo-hygiene.mjs --json` and `scripts/doctor.mjs --json`: emit
   machine-readable health reports for CI, external orchestrators, or local
   dashboards.
+- `scripts/route-fixtures.mjs --json`: emits a machine-readable route
+  regression report for dashboards or CI adapters.
 
 The GitHub Actions workflow runs `route-fixtures.mjs`, `repo-hygiene.mjs`, and
-`doctor.mjs --source-only`, then verifies the JSON report modes through
+`doctor.mjs --source-only`, then verifies the JSON report modes for all three
+source checks through
 `check-source.mjs` on Ubuntu and Windows, so pull requests can validate the
 source tree without needing a Codex App profile or local model catalog.
 

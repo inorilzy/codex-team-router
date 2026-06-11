@@ -22,6 +22,10 @@ const textChecks = [
 
 const jsonChecks = [
   {
+    name: "route fixtures JSON report",
+    args: [join(scriptDir, "route-fixtures.mjs"), "--json"]
+  },
+  {
     name: "repo hygiene JSON report",
     args: [join(scriptDir, "repo-hygiene.mjs"), "--json"]
   },
@@ -70,14 +74,14 @@ function runJsonCheck(check) {
 
   const failCount = report?.summary?.fail_count;
   const warnCount = report?.summary?.warn_count || 0;
-  const checkCount = report?.summary?.check_count;
+  const itemCount = report?.summary?.check_count || report?.summary?.fixture_count;
   if (failCount !== 0) {
     console.error(result.stdout);
     console.error(`\nFAIL ${check.name}: report contains ${failCount} failure(s)`);
     process.exit(1);
   }
 
-  console.log(`PASS ${check.name}: ${failCount} fail(s), ${warnCount} warning(s), ${checkCount} check(s).`);
+  console.log(`PASS ${check.name}: ${failCount} fail(s), ${warnCount} warning(s), ${itemCount} item(s).`);
 }
 
 for (const check of textChecks) {

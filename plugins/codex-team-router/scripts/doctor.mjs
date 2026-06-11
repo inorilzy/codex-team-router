@@ -27,13 +27,51 @@ const routeMarker = "CODEX_TEAM_ROUTER_ROUTE_REQUIRED";
 const hookWorkspaceDir = mkdtempSync(join(tmpdir(), "codex-team-router-doctor-work-"));
 const runtimeStatusPath = join(hookWorkspaceDir, ".codex", "team-router", "status.json");
 const sourceOnly = process.argv.includes("--source-only");
+const jsonMode = process.argv.includes("--json");
 
 const results = [];
 
 function record(level, message, detail = "") {
   results.push({ level, message, detail });
+  if (jsonMode) return;
   const suffix = detail ? `\n    ${detail}` : "";
   console.log(`${level.toUpperCase()}: ${message}${suffix}`);
+}
+
+function nextStepsForWarnings(warnCount) {
+  if (warnCount === 0) return [];
+  if (sourceOnly) {
+    return ["Source-only mode should normally be warning-free. Inspect the warning details before publishing."];
+  }
+  return [
+    "If the plugin is not installed, add this marketplace and run `codex plugin add codex-team-router@codex-team-router`.",
+    "If trusted hook entries are missing, restart Codex App or open a new thread, then review and trust the plugin hooks.",
+    "If global custom agents drift from bundled templates, run `node scripts/sync-agents.mjs --global --write` from the plugin root, adding `--force` only when overwriting is intentional."
+  ];
+}
+
+function printJsonReport(error = null) {
+  const failCount = results.filter((item) => item.level === "fail").length + (error ? 1 : 0);
+  const warnCount = results.filter((item) => item.level === "warn").length;
+  const report = {
+    tool: "doctor",
+    plugin_root: pluginRoot,
+    codex_home: codexHome,
+    mode: sourceOnly ? "source-only" : "full",
+    summary: {
+      fail_count: failCount,
+      warn_count: warnCount,
+      check_count: results.length
+    },
+    results,
+    next_steps: nextStepsForWarnings(warnCount)
+  };
+
+  if (error) {
+    report.error = error.message;
+  }
+
+  console.log(JSON.stringify(report, null, 2));
 }
 
 function readText(path) {
@@ -358,13 +396,15 @@ function checkBundledAgentTemplates() {
 }
 
 try {
-  console.log("Codex Team Router doctor");
-  console.log(`Plugin root: ${pluginRoot}`);
-  console.log(`Codex home: ${codexHome}`);
-  if (sourceOnly) {
-    console.log("Mode: source-only");
+  if (!jsonMode) {
+    console.log("Codex Team Router doctor");
+    console.log(`Plugin root: ${pluginRoot}`);
+    console.log(`Codex home: ${codexHome}`);
+    if (sourceOnly) {
+      console.log("Mode: source-only");
+    }
+    console.log("");
   }
-  console.log("");
 
   checkFiles();
   checkManifest();
@@ -383,24 +423,32 @@ try {
   const failCount = results.filter((item) => item.level === "fail").length;
   const warnCount = results.filter((item) => item.level === "warn").length;
 
-  console.log("");
-  console.log(`Summary: ${failCount} fail(s), ${warnCount} warning(s), ${results.length} check(s).`);
-
-  if (warnCount > 0) {
+  if (jsonMode) {
+    printJsonReport();
+  } else {
     console.log("");
-    console.log("Next steps for warnings:");
-    if (sourceOnly) {
-      console.log("- Source-only mode should normally be warning-free. Inspect the warning details above before publishing.");
-    } else {
-      console.log("- If the plugin is not installed, add this marketplace and run `codex plugin add codex-team-router@codex-team-router`.");
-      console.log("- If trusted hook entries are missing, restart Codex App or open a new thread, then review and trust the plugin hooks.");
-      console.log("- If global custom agents drift from bundled templates, run `node scripts/sync-agents.mjs --global --write` from the plugin root, adding `--force` only when overwriting is intentional.");
+    console.log(`Summary: ${failCount} fail(s), ${warnCount} warning(s), ${results.length} check(s).`);
+
+    const nextSteps = nextStepsForWarnings(warnCount);
+    if (nextSteps.length > 0) {
+      console.log("");
+      console.log("Next steps for warnings:");
+      for (const step of nextSteps) {
+        console.log(`- ${step}`);
+      }
     }
   }
 
   if (failCount > 0) {
     process.exitCode = 1;
   }
+} catch (error) {
+  if (jsonMode) {
+    printJsonReport(error);
+  } else {
+    console.error(`FAIL: ${error.message}`);
+  }
+  process.exitCode = 1;
 } finally {
   rmSync(hookWorkspaceDir, { recursive: true, force: true });
 }

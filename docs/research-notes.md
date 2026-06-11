@@ -34,6 +34,18 @@ Router without turning the plugin into a separate runtime.
 - [Ask149/orchestrator](https://github.com/Ask149/orchestrator): useful testing
   ideas include cross-platform config path resolution, temporary file handling,
   and secure permission defaults.
+- [ccswarm](https://github.com/nwiizo/ccswarm): useful ideas include
+  specialized agent pools, template-based scaffolding, and git worktree
+  isolation for parallel development.
+- [Squad](https://github.com/bradygaster/squad): useful ideas include
+  repository-native agents represented as files, persistent decisions, and
+  human-directed oversight.
+- [Claude Swarm](https://github.com/affaan-m/claude-swarm): useful ideas
+  include task decomposition, real-time coordination, and a visible terminal UI
+  for multi-agent work.
+- [awesome-codex-plugins](https://github.com/hashgraph-online/awesome-codex-plugins):
+  useful ecosystem signal that Codex plugins are increasingly packaged around
+  skills, hooks, and repo context.
 
 ## Adopted now
 
@@ -62,6 +74,8 @@ Router without turning the plugin into a separate runtime.
   leave `.codex/` state files in the repository.
 - Add a repo hygiene check to keep README language split, marketplace identity,
   plugin identity, skill identity, and runtime artifact boundaries under CI.
+- Add machine-readable JSON health reports for repo hygiene and doctor checks,
+  then exercise those report modes from the single source-check command.
 
 ## Not adopted yet
 

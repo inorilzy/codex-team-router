@@ -8,11 +8,13 @@ const pluginRoot = dirname(scriptDir);
 const repoRoot = dirname(dirname(pluginRoot));
 const pluginId = "codex-team-router";
 const displayName = "Codex Team Router";
+const jsonMode = process.argv.includes("--json");
 
 const checks = [];
 
 function record(ok, message, detail = "") {
   checks.push({ ok, message, detail });
+  if (jsonMode) return;
   console.log(`${ok ? "PASS" : "FAIL"} ${message}`);
   if (detail) console.log(`    ${detail}`);
 }
@@ -109,9 +111,11 @@ function checkCiWorkflow() {
 }
 
 try {
-  console.log("Codex Team Router repo hygiene");
-  console.log(`Repo root: ${repoRoot}`);
-  console.log("");
+  if (!jsonMode) {
+    console.log("Codex Team Router repo hygiene");
+    console.log(`Repo root: ${repoRoot}`);
+    console.log("");
+  }
 
   checkReadmes();
   checkMarketplace();
@@ -121,13 +125,38 @@ try {
   checkCiWorkflow();
 
   const failCount = checks.filter((check) => !check.ok).length;
-  console.log("");
-  console.log(`Summary: ${failCount} fail(s), ${checks.length} check(s).`);
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      tool: "repo-hygiene",
+      repo_root: repoRoot,
+      summary: {
+        fail_count: failCount,
+        check_count: checks.length
+      },
+      checks
+    }, null, 2));
+  } else {
+    console.log("");
+    console.log(`Summary: ${failCount} fail(s), ${checks.length} check(s).`);
+  }
 
   if (failCount > 0) {
     process.exit(1);
   }
 } catch (error) {
-  console.error(`FAIL ${error.message}`);
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      tool: "repo-hygiene",
+      repo_root: repoRoot,
+      summary: {
+        fail_count: 1,
+        check_count: checks.length
+      },
+      checks,
+      error: error.message
+    }, null, 2));
+  } else {
+    console.error(`FAIL ${error.message}`);
+  }
   process.exit(1);
 }

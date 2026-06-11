@@ -267,8 +267,8 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 ## Maintenance scripts
 
 - `scripts/check-source.mjs`: runs the source-tree checks used by GitHub
-  Actions. It currently runs route fixtures, repo hygiene, and source-only
-  doctor.
+  Actions. It currently runs route fixtures, repo hygiene, source-only doctor,
+  and machine-readable JSON report checks.
 - `scripts/repo-hygiene.mjs`: checks README language split, marketplace and
   plugin identity, skill identity, and absence of generated runtime state.
 - `scripts/route-fixtures.mjs`: runs hook classification fixtures in temporary
@@ -287,11 +287,14 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 - `scripts/doctor.mjs`: checks plugin structure, hook simulation, model catalog
   fallback, runtime status summary, install state, hook trust, and
   bundled/global custom-agent drift.
+- `scripts/repo-hygiene.mjs --json` and `scripts/doctor.mjs --json`: emit
+  machine-readable health reports for CI, external orchestrators, or local
+  dashboards.
 
 The GitHub Actions workflow runs `route-fixtures.mjs`, `repo-hygiene.mjs`, and
-`doctor.mjs --source-only` through `check-source.mjs` on Ubuntu and Windows, so
-pull requests can validate the source tree without needing a Codex App profile
-or local model catalog.
+`doctor.mjs --source-only`, then verifies the JSON report modes through
+`check-source.mjs` on Ubuntu and Windows, so pull requests can validate the
+source tree without needing a Codex App profile or local model catalog.
 
 See [docs/release-checklist.md](docs/release-checklist.md) for the full
 pre-publish checklist.

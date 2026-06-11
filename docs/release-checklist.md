@@ -16,6 +16,8 @@ The command runs:
 - `scripts/route-fixtures.mjs`
 - `scripts/repo-hygiene.mjs`
 - `scripts/doctor.mjs --source-only`
+- `scripts/repo-hygiene.mjs --json`
+- `scripts/doctor.mjs --source-only --json`
 
 ## Plugin validation
 

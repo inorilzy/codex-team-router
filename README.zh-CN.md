@@ -232,15 +232,16 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 
 ## 维护脚本
 
-- `scripts/check-source.mjs`：运行 GitHub Actions 使用的源码树检查。目前会运行 route fixtures、repo hygiene 和 source-only doctor。
+- `scripts/check-source.mjs`：运行 GitHub Actions 使用的源码树检查。目前会运行 route fixtures、repo hygiene、source-only doctor，以及机器可读 JSON report 检查。
 - `scripts/repo-hygiene.mjs`：检查 README 中英文拆分、marketplace 和插件身份、skill 身份，以及是否没有生成的运行时状态。
 - `scripts/route-fixtures.mjs`：在临时 workspace 中运行 hook 分类 fixtures，检查 marker 注入、route 分类、`status.json`、`task_board` 和 `next_action`。
 - `scripts/smoke-install.mjs`：创建临时 `CODEX_HOME`，添加本地 repo marketplace，安装 `codex-team-router@codex-team-router`，并检查 Codex 是否显示 installed 和 enabled。
 - `scripts/sync-agents.mjs`：预览或安装 bundled custom-agent 模板到项目 `.codex/agents`、全局 `~/.codex/agents` 或自定义目录。默认只复制缺失文件；只有显式使用 `--force --write` 才覆盖不同文件。
 - `scripts/doctor.mjs --source-only`：只检查源码树结构、hook 模拟、runtime status summary 和 bundled custom-agent 模板，不需要本地 Codex 安装。
 - `scripts/doctor.mjs`：检查插件结构、hook 模拟、模型 catalog fallback、runtime status summary、安装状态、hook trust，以及 bundled/global custom-agent 是否漂移。
+- `scripts/repo-hygiene.mjs --json` 和 `scripts/doctor.mjs --json`：输出机器可读健康报告，可供 CI、外部 orchestrator 或本地 dashboard 解析。
 
-GitHub Actions workflow 会在 Ubuntu 和 Windows 上通过 `check-source.mjs` 运行 `route-fixtures.mjs`、`repo-hygiene.mjs` 和 `doctor.mjs --source-only`，所以 pull request 可以在没有 Codex App profile 或本地模型 catalog 的环境里验证源码树。
+GitHub Actions workflow 会在 Ubuntu 和 Windows 上通过 `check-source.mjs` 运行 `route-fixtures.mjs`、`repo-hygiene.mjs`、`doctor.mjs --source-only`，并验证 JSON report 模式，所以 pull request 可以在没有 Codex App profile 或本地模型 catalog 的环境里验证源码树。
 
 完整发布前检查见 [docs/release-checklist.md](docs/release-checklist.md)。
 

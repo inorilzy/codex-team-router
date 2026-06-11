@@ -1,6 +1,6 @@
 name = "reviewer"
 description = "Use for independent review after implementation. The reviewer does not edit files and returns findings first."
-model = "gpt-5.5"
+model = "gpt-5.4"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Halley", "Feynman", "Lovelace", "Descartes"]

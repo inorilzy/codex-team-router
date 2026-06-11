@@ -1,7 +1,7 @@
 name = "analyst"
 description = "Use before planning when a request may contain ambiguity, missing constraints, contradictions, or execution risks. Read-only."
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["Metis", "Ada", "Sagan", "Babbage"]
 

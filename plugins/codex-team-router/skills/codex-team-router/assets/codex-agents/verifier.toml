@@ -1,7 +1,7 @@
 name = "verifier"
 description = "Use for independent validation when main-thread verification is expensive or benefits from isolation."
-model = "gpt-5.4"
-model_reasoning_effort = "medium"
+model = "gpt-5.4-mini"
+model_reasoning_effort = "low"
 sandbox_mode = "read-only"
 nickname_candidates = ["Gibbs", "Euler", "Boole", "Lamarr"]
 

@@ -1,7 +1,7 @@
 name = "planner"
 description = "Use for planning bounded multi-agent work before implementation. The planner does not edit files."
 model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Planck", "Curie", "Hegel", "Turing"]
 

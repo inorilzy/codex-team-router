@@ -21,9 +21,12 @@ The command runs:
 - `scripts/repo-hygiene.mjs --json`
 - `scripts/doctor.mjs --source-only --json`
 - `scripts/sync-agents.mjs --json`
+- `scripts/sync-agents.mjs --target <temp> --write --json`
 
 Every JSON report should include top-level `schema_version: 1`. The aggregate
 `check-source.mjs --json` command validates child report schema versions.
+The source check also verifies that the sync-agents write path creates all
+seven bundled custom-agent templates in a temporary directory.
 
 `route-fixtures.mjs` should cover simple terminal prompts, casual chat, review
 prompts, standard UI work, `parallel_read`, complex game work, `high_risk`, and

@@ -281,7 +281,8 @@ The generated file records `catalog_path`, `catalog_paths_checked`, per-profile
 
 - `scripts/check-source.mjs`: runs the source-tree checks used by GitHub
   Actions. It currently runs route fixtures, repo hygiene, source-only doctor,
-  and machine-readable JSON report checks.
+  machine-readable JSON report checks, and a temporary agent-template write
+  smoke test.
 - `scripts/check-source.mjs --json`: emits the aggregate machine-readable
   source-check report, including text-mode and JSON-mode child checks.
 - `scripts/repo-hygiene.mjs`: checks README language split, marketplace and

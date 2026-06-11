@@ -244,7 +244,7 @@ node plugins\codex-team-router\scripts\refresh-model-profiles.mjs plugins\codex-
 
 ## 维护脚本
 
-- `scripts/check-source.mjs`：运行 GitHub Actions 使用的源码树检查。目前会运行 route fixtures、repo hygiene、source-only doctor，以及机器可读 JSON report 检查。
+- `scripts/check-source.mjs`：运行 GitHub Actions 使用的源码树检查。目前会运行 route fixtures、repo hygiene、source-only doctor、机器可读 JSON report 检查，以及临时目录 agent-template 写入冒烟测试。
 - `scripts/check-source.mjs --json`：输出聚合后的机器可读 source-check 报告，包含文本模式和 JSON 模式子检查。
 - `scripts/repo-hygiene.mjs`：检查 README 中英文拆分、marketplace 和插件身份、skill 身份，以及是否没有生成的运行时状态。
 - `scripts/route-fixtures.mjs`：在临时 workspace 中运行 hook 分类 fixtures，检查 marker 注入、route 分类、`status.json`、`task_board` 和 `next_action`。

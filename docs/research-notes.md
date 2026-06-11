@@ -87,6 +87,9 @@ Router without turning the plugin into a separate runtime.
   and have the aggregate source check reject child reports without it.
 - Add a machine-readable `sync-agents.mjs --json` dry-run report so custom-agent
   template sync plans can be inspected by CI or external dashboards.
+- Exercise `sync-agents.mjs --target <temp> --write --json` from the aggregate
+  source check so the write path is continuously tested without touching user
+  agent directories.
 
 ## Not adopted yet
 
